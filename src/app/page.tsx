@@ -423,10 +423,6 @@ export default function LandingPage() {
               CybRisk · Security Ronin · Albert Hui · (ISC)&sup2; Information Security Leadership Achievements Honouree
             </div>
             <div>DataExpert Vibe Coding Challenge · Feb 2026</div>
-            <div className="mt-2" style={{ color: '#2a3548' }}>
-              IBM Cost of a Breach 2024 · Verizon DBIR 2024 · NetDiligence
-              Cyber Claims Study 2023
-            </div>
           </div>
         </footer>
       </main>
