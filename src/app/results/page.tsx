@@ -9,6 +9,8 @@ import ExceedanceCurve from '@/components/results/ExceedanceCurve';
 import KeyDrivers from '@/components/results/KeyDrivers';
 import Recommendations from '@/components/results/Recommendations';
 import IndustryBenchmark from '@/components/results/IndustryBenchmark';
+import ResultsSurface from '@/components/results/ResultsSurface';
+import { TEF_BY_INDUSTRY } from '@/lib/lookup-tables';
 
 const glassmorphism: React.CSSProperties = {
   background: 'rgba(4, 8, 28, 0.92)',
@@ -99,6 +101,20 @@ export default function ResultsPage() {
             />
           </div>
         </div>
+
+        {/* 3D Surface - full width */}
+        {inputs && (
+          <div style={glassmorphism} className="mt-6">
+            <ResultsSurface
+              aleMean={results.ale.mean}
+              pml95={results.ale.p95}
+              gordonLoeb={results.gordonLoebSpend}
+              tefMin={TEF_BY_INDUSTRY[inputs.company.industry].min}
+              tefMode={TEF_BY_INDUSTRY[inputs.company.industry].mode}
+              tefMax={TEF_BY_INDUSTRY[inputs.company.industry].max}
+            />
+          </div>
+        )}
 
         {/* Bottom panels - two columns */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

@@ -151,11 +151,12 @@ const CELL_BORDER = {
 // ---------------------------------------------------------------------------
 // Chart rendering — Canvas 2D → PNG → Uint8Array for DOCX embedding
 // ---------------------------------------------------------------------------
-const CHART_W = 1200; // 2x retina
+const CHART_W = 1200; // 2x retina canvas resolution
 const CHART_H = 520;
-const EMU_PER_INCH = 914400;
-const CHART_WIDTH_EMU = 6 * EMU_PER_INCH; // 6 inches
-const CHART_HEIGHT_EMU = 2.6 * EMU_PER_INCH; // proportional
+// docx ImageRun transformation uses PIXELS at 96 DPI (NOT EMU)
+const DPI = 96;
+const CHART_WIDTH_PX = 6 * DPI; // 6 inches → 576 pixels
+const CHART_HEIGHT_PX = Math.round(2.6 * DPI); // 2.6 inches → 250 pixels
 
 function canvasToPngBytes(canvas: HTMLCanvasElement): Uint8Array {
   const dataUrl = canvas.toDataURL('image/png');
@@ -1129,8 +1130,8 @@ function buildDocument(
           type: 'png',
           data: charts.distribution,
           transformation: {
-            width: CHART_WIDTH_EMU,
-            height: CHART_HEIGHT_EMU,
+            width: CHART_WIDTH_PX,
+            height: CHART_HEIGHT_PX,
           },
         }),
       ],
@@ -1159,8 +1160,8 @@ function buildDocument(
           type: 'png',
           data: charts.exceedance,
           transformation: {
-            width: CHART_WIDTH_EMU,
-            height: CHART_HEIGHT_EMU,
+            width: CHART_WIDTH_PX,
+            height: CHART_HEIGHT_PX,
           },
         }),
       ],
@@ -1190,8 +1191,8 @@ function buildDocument(
           type: 'png',
           data: charts.surface,
           transformation: {
-            width: CHART_WIDTH_EMU,
-            height: Math.round(3.5 * EMU_PER_INCH),
+            width: CHART_WIDTH_PX,
+            height: Math.round(3.5 * DPI),
           },
         }),
       ],
@@ -1660,7 +1661,7 @@ function buildDocument(
   );
 
   // Benchmark chart image
-  const BENCH_HEIGHT_EMU = Math.round(1.9 * EMU_PER_INCH);
+  const BENCH_HEIGHT_PX = Math.round(1.9 * DPI);
   benchChildren.push(
     new Paragraph({
       children: [
@@ -1668,8 +1669,8 @@ function buildDocument(
           type: 'png',
           data: charts.benchmark,
           transformation: {
-            width: CHART_WIDTH_EMU,
-            height: BENCH_HEIGHT_EMU,
+            width: CHART_WIDTH_PX,
+            height: BENCH_HEIGHT_PX,
           },
         }),
       ],
