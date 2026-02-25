@@ -53,6 +53,14 @@ function surfaceZ(col: number, row: number, t: number): number {
   return tef * exc + wave;
 }
 
+// Compute the TRUE exceedance probability (without animation wave)
+function trueExceedance(col: number, row: number): number {
+  const loss = Math.max(1, (col / (COLS - 1)) * MAX_LOSS);
+  const tef = MIN_TEF + (row / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
+  const z = (Math.log(loss) - LOG_MU) / LOG_SIG;
+  return normSF(z) * tef;
+}
+
 // Color: deep navy → indigo → cyan → teal → amber → crimson
 function surfaceColor(z: number): string {
   const r = Math.min(1, z / 2.2);
@@ -76,17 +84,49 @@ function surfaceColor(z: number): string {
   return `hsl(${40 - p * 35},90%,${58 + p * 6}%)`;
 }
 
+// Rounded rect helper
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
 // ─── Component ───────────────────────────────────────────────────
 
 export default function HeroChart() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
+  const mouseRef = useRef({ x: 0, y: 0, active: false });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // ── Mouse tracking ──
+    const onMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current.x = e.clientX - rect.left;
+      mouseRef.current.y = e.clientY - rect.top;
+      mouseRef.current.active = true;
+    };
+    const onMouseLeave = () => {
+      mouseRef.current.active = false;
+    };
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseleave', onMouseLeave);
 
     const dpr = window.devicePixelRatio || 1;
     let W = 0,
@@ -144,7 +184,6 @@ export default function HeroChart() {
       ctx.lineTo(px(COLS - 1, ROWS - 1), py(COLS - 1, ROWS - 1, 0));
       ctx.lineTo(px(COLS - 1, 0), py(COLS - 1, 0, 0));
       ctx.stroke();
-      // Back edges
       ctx.beginPath();
       ctx.moveTo(px(0, 0), py(0, 0, 0));
       ctx.lineTo(px(COLS - 1, 0), py(COLS - 1, 0, 0));
@@ -193,7 +232,6 @@ export default function HeroChart() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Label at back edge of line
         const z0 = surfaceZ(ref.col, 0, t);
         const lx = px(ref.col, 0);
         const ly = py(ref.col, 0, z0);
@@ -202,11 +240,133 @@ export default function HeroChart() {
         ctx.fillText(ref.label, lx - 4, ly - 10);
       }
 
+      // ── Interactive hover: crosshair + tooltip ──
+      const mouse = mouseRef.current;
+      if (mouse.active) {
+        // Hit-test: find nearest surface vertex to mouse
+        let nCol = 0, nRow = 0, nSx = 0, nSy = 0, nDist = Infinity;
+        for (let row = 0; row < ROWS; row++) {
+          for (let col = 0; col < COLS; col++) {
+            const z = surfaceZ(col, row, t);
+            const sx = px(col, row);
+            const sy = py(col, row, z);
+            const d = (sx - mouse.x) ** 2 + (sy - mouse.y) ** 2;
+            if (d < nDist) {
+              nDist = d;
+              nCol = col;
+              nRow = row;
+              nSx = sx;
+              nSy = sy;
+            }
+          }
+        }
+        nDist = Math.sqrt(nDist);
+
+        if (nDist < 35) {
+          // ── Crosshair: column line (fixed col, all rows) ──
+          ctx.save();
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = 'rgba(0,210,255,0.5)';
+
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(180,230,255,0.45)';
+          ctx.lineWidth = 1.5;
+          for (let r = 0; r < ROWS; r++) {
+            const z = surfaceZ(nCol, r, t);
+            const x = px(nCol, r);
+            const y = py(nCol, r, z);
+            if (r === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          // ── Crosshair: row line (fixed row, all cols) ──
+          ctx.beginPath();
+          for (let c = 0; c < COLS; c++) {
+            const z = surfaceZ(c, nRow, t);
+            const x = px(c, nRow);
+            const y = py(c, nRow, z);
+            if (c === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.restore();
+
+          // ── Glowing intersection dot ──
+          const dotGlow = ctx.createRadialGradient(
+            nSx, nSy, 0,
+            nSx, nSy, 14,
+          );
+          dotGlow.addColorStop(0, 'rgba(255,255,255,0.9)');
+          dotGlow.addColorStop(0.25, 'rgba(0,210,255,0.5)');
+          dotGlow.addColorStop(1, 'transparent');
+          ctx.fillStyle = dotGlow;
+          ctx.fillRect(nSx - 14, nSy - 14, 28, 28);
+
+          ctx.beginPath();
+          ctx.arc(nSx, nSy, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+
+          // ── Tooltip ──
+          const lossVal = (nCol / (COLS - 1)) * MAX_LOSS;
+          const tefVal = MIN_TEF + (nRow / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
+          const excProb = trueExceedance(nCol, nRow);
+
+          const fmtLoss =
+            lossVal < 1000 ? '$0' : `$${(lossVal / 1e6).toFixed(2)}M`;
+          const fmtTef = `${tefVal.toFixed(2)} /yr`;
+          const fmtExc = `${(excProb * 100).toFixed(1)}%`;
+
+          const ttW = 185;
+          const ttH = 64;
+          let ttX = nSx + 22;
+          let ttY = nSy - 72;
+
+          // Flip if near edges
+          if (ttX + ttW > W - 10) ttX = nSx - ttW - 22;
+          if (ttY < 10) ttY = nSy + 22;
+
+          // Background
+          ctx.save();
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = 'rgba(0,120,255,0.2)';
+          roundRect(ctx, ttX, ttY, ttW, ttH, 6);
+          ctx.fillStyle = 'rgba(4,8,28,0.94)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(0,180,255,0.35)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+
+          // Text
+          const ttFs = Math.max(10, cw * 1.2);
+          ctx.font = `${ttFs}px monospace`;
+
+          ctx.fillStyle = '#506880';
+          ctx.fillText('Loss', ttX + 10, ttY + 17);
+          ctx.fillText('TEF λ', ttX + 10, ttY + 35);
+          ctx.fillText('P(L>x)', ttX + 10, ttY + 53);
+
+          ctx.fillStyle = '#d0e4ff';
+          ctx.textAlign = 'right';
+          ctx.fillText(fmtLoss, ttX + ttW - 10, ttY + 17);
+          ctx.fillText(fmtTef, ttX + ttW - 10, ttY + 35);
+
+          // Exceedance in accent color based on severity
+          const excColor =
+            excProb > 0.5 ? '#ef4444' : excProb > 0.2 ? '#ffd060' : '#00d4ff';
+          ctx.fillStyle = excColor;
+          ctx.fillText(fmtExc, ttX + ttW - 10, ttY + 53);
+
+          ctx.textAlign = 'left';
+        }
+      }
+
       // ── Axis labels ──
       const fs = Math.max(8, W * 0.009);
       ctx.font = `${fs}px monospace`;
 
-      // X-axis (Loss Amount)
       ctx.fillStyle = 'rgba(0,180,255,0.4)';
       ctx.fillText(
         'Loss Amount ($) →',
@@ -214,14 +374,12 @@ export default function HeroChart() {
         py(COLS * 0.4, ROWS - 1, 0) + 18,
       );
 
-      // Y-axis (TEF)
       ctx.fillText(
         '← TEF (λ)',
         px(0, ROWS - 1) - 60,
         py(0, ROWS - 1, 0) + 14,
       );
 
-      // Z-axis (exceedance probability)
       ctx.save();
       ctx.translate(ox - (ROWS - 1) * cw * 0.38 - 20, oy - zSc * 1.6);
       ctx.rotate(-Math.PI / 2);
@@ -254,6 +412,8 @@ export default function HeroChart() {
     rafRef.current = requestAnimationFrame(draw);
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      canvas.removeEventListener('mousemove', onMouseMove);
+      canvas.removeEventListener('mouseleave', onMouseLeave);
       ro.disconnect();
     };
   }, []);
@@ -261,7 +421,7 @@ export default function HeroChart() {
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: '100%', height: '100%', cursor: 'crosshair' }}
     />
   );
 }
