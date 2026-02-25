@@ -37,7 +37,12 @@ export default function LorenzCanvas({ riskRating }: LorenzCanvasProps) {
     let z = 1;
     let theta = 0;
 
-    const trail: { x: number; y: number; z: number }[] = [];
+    // Circular buffer for trail (avoids O(n) array.shift)
+    const trailX = new Float32Array(TRAIL_LEN);
+    const trailY = new Float32Array(TRAIL_LEN);
+    const trailZ = new Float32Array(TRAIL_LEN);
+    let trailHead = 0;
+    let trailCount = 0;
 
     const dpr = window.devicePixelRatio || 1;
     let W = 0;
@@ -62,9 +67,13 @@ export default function LorenzCanvas({ riskRating }: LorenzCanvasProps) {
         x += dx;
         y += dy;
         z += dz;
-        trail.push({ x, y, z });
+        const idx = trailHead % TRAIL_LEN;
+        trailX[idx] = x;
+        trailY[idx] = y;
+        trailZ[idx] = z;
+        trailHead++;
+        if (trailCount < TRAIL_LEN) trailCount++;
       }
-      while (trail.length > TRAIL_LEN) trail.shift();
 
       // Slowly rotate
       theta += 0.001;
@@ -78,19 +87,24 @@ export default function LorenzCanvas({ riskRating }: LorenzCanvasProps) {
       const cy = H / 2;
       const scale = Math.min(W, H) / 80;
 
-      for (let i = 0; i < trail.length; i++) {
-        const p = trail[i];
-        const projX = p.x * cosT - p.y * sinT;
-        const projY = p.z;
+      // Render trail from oldest to newest
+      const start = trailHead - trailCount;
+      for (let i = 0; i < trailCount; i++) {
+        const idx = (start + i) % TRAIL_LEN;
+        const px = trailX[idx];
+        const py = trailY[idx];
+        const pz = trailZ[idx];
+        const projX = px * cosT - py * sinT;
+        const projY = pz;
 
         const sx = cx + projX * scale;
         const sy = cy - (projY - 25) * scale;
 
         // Age factor: 0 (old) to 1 (new)
-        const age = i / trail.length;
+        const age = i / trailCount;
 
         // Color: cyan for recent, deep blue for old
-        const r = Math.round(0 + age * 0);
+        const r = 0;
         const g = Math.round(20 + age * 192);
         const b = Math.round(64 + age * 191);
         const a = 0.03 + age * 0.03; // 3% to 6% opacity

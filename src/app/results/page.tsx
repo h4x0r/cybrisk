@@ -24,7 +24,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('cybrisk-results');
+      const raw = sessionStorage.getItem('results');
       if (!raw) {
         router.replace('/assess');
         return;

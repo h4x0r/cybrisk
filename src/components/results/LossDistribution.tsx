@@ -166,10 +166,25 @@ export default function LossDistribution({
         ctx.restore();
       }
 
+      // Helper: map a dollar value to bar X coordinate
+      const valueToBarX = (val: number): number | null => {
+        const idx = buckets.findIndex(b => val >= b.minValue && val <= b.maxValue);
+        if (idx < 0) {
+          // If beyond last bucket, clamp to right edge
+          if (val > buckets[buckets.length - 1].maxValue) {
+            return padL + (buckets.length - 1) * (barW + gap) + barW;
+          }
+          return null;
+        }
+        // Interpolate within bucket
+        const b = buckets[idx];
+        const frac = b.maxValue > b.minValue ? (val - b.minValue) / (b.maxValue - b.minValue) : 0.5;
+        return padL + idx * (barW + gap) + frac * barW;
+      };
+
       // ALE reference line
-      const aleX =
-        padL + (aleMean / maxVal) * chartW;
-      if (aleX >= padL && aleX <= padL + chartW) {
+      const aleX = valueToBarX(aleMean);
+      if (aleX !== null && aleX >= padL && aleX <= padL + chartW) {
         ctx.beginPath();
         ctx.setLineDash([5, 4]);
         ctx.strokeStyle = '#00d4ff';
@@ -184,9 +199,8 @@ export default function LossDistribution({
       }
 
       // PML reference line
-      const pmlX =
-        padL + (pml95 / maxVal) * chartW;
-      if (pmlX >= padL && pmlX <= padL + chartW) {
+      const pmlX = valueToBarX(pml95);
+      if (pmlX !== null && pmlX >= padL && pmlX <= padL + chartW) {
         ctx.beginPath();
         ctx.setLineDash([5, 4]);
         ctx.strokeStyle = '#ef4444';

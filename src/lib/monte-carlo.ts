@@ -133,14 +133,7 @@ export function samplePERT(
 
   // Guard against degenerate cases
   if (alpha <= 0 || !isFinite(alpha)) {
-    // Fallback: use triangular-like sampling
-    const beta_param = (alpha * (max - mu)) / (mu - min);
-    if (beta_param <= 0 || !isFinite(beta_param)) {
-      // Simple fallback
-      return min + (max - min) * rng();
-    }
-    const x = sampleBeta(alpha, beta_param, rng);
-    return min + (max - min) * x;
+    return min + (max - min) * rng();
   }
 
   const beta_param = (alpha * (max - mu)) / (mu - min);
