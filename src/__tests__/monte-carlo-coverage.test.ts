@@ -243,7 +243,7 @@ describe('formatCurrency via distribution bucket labels', () => {
 // 6. identifyKeyDrivers — cover all branches
 // =========================================================================
 describe('identifyKeyDrivers branches', () => {
-  it('flags regulatory exposure HIGH for EU (maxPctRevenue >= 0.04)', () => {
+  it('flags regulatory exposure HIGH for EU financial (compound GDPR + DORA + NIS2)', () => {
     const inputs: AssessmentInputs = {
       ...BASE_INPUTS,
       company: { ...BASE_INPUTS.company, geography: 'eu' },
@@ -253,6 +253,8 @@ describe('identifyKeyDrivers branches', () => {
     expect(regDriver).toBeDefined();
     expect(regDriver!.impact).toBe('HIGH');
     expect(regDriver!.description).toContain('GDPR');
+    expect(regDriver!.description).toContain('DORA');
+    expect(regDriver!.description).toContain('6.0%');
   });
 
   it('flags regulatory exposure HIGH for UK (maxPctRevenue >= 0.04)', () => {
@@ -264,8 +266,21 @@ describe('identifyKeyDrivers branches', () => {
     expect(drivers.some((d) => d.factor === 'Regulatory Exposure')).toBe(true);
   });
 
-  it('does NOT flag regulatory exposure for HK (maxPctRevenue < 0.04)', () => {
-    const drivers = identifyKeyDrivers(BASE_INPUTS); // geography: 'hk'
+  it('flags regulatory exposure MEDIUM for HK financial (compound PDPO + HKMA)', () => {
+    const drivers = identifyKeyDrivers(BASE_INPUTS); // geography: 'hk', industry: 'financial'
+    const regDriver = drivers.find((d) => d.factor === 'Regulatory Exposure');
+    expect(regDriver).toBeDefined();
+    expect(regDriver!.impact).toBe('MEDIUM');
+    expect(regDriver!.description).toContain('PDPO');
+    expect(regDriver!.description).toContain('HKMA CFI');
+  });
+
+  it('does NOT flag regulatory exposure for HK entertainment (no overlay)', () => {
+    const inputs: AssessmentInputs = {
+      ...BASE_INPUTS,
+      company: { ...BASE_INPUTS.company, industry: 'entertainment' as const },
+    };
+    const drivers = identifyKeyDrivers(inputs);
     expect(drivers.some((d) => d.factor === 'Regulatory Exposure')).toBe(false);
   });
 

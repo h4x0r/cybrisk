@@ -6,6 +6,7 @@ import {
   ATTACK_PATTERN_FREQ,
   INCIDENT_COST_BY_REVENUE,
   REGULATORY_EXPOSURE,
+  getRegulatoryCoverage,
   TEF_BY_INDUSTRY,
   BASE_VULNERABILITY,
   REVENUE_MIDPOINTS,
@@ -32,8 +33,42 @@ describe('lookup-tables', () => {
     expect(COST_MODIFIERS.ir_plan).toBe(-0.23);
   });
 
-  it('EU regulatory exposure is 4% of revenue', () => {
+  it('EU base regulatory exposure is 4% of revenue', () => {
     expect(REGULATORY_EXPOSURE.eu.maxPctRevenue).toBe(0.04);
+  });
+
+  it('getRegulatoryCoverage returns base rate for industries without overlays', () => {
+    const profile = getRegulatoryCoverage('eu', 'media');
+    expect(profile.maxPctRevenue).toBe(0.04);
+    expect(profile.frameworks).toEqual(['GDPR']);
+  });
+
+  it('compounds HIPAA on US healthcare', () => {
+    const profile = getRegulatoryCoverage('us', 'healthcare');
+    expect(profile.maxPctRevenue).toBe(0.025); // 1% + 1.5%
+    expect(profile.frameworks).toContain('State breach notification');
+    expect(profile.frameworks).toContain('HIPAA');
+  });
+
+  it('compounds DORA + NIS2 on EU financial', () => {
+    const profile = getRegulatoryCoverage('eu', 'financial');
+    expect(profile.maxPctRevenue).toBe(0.06); // 4% + 1.5% + 0.5%
+    expect(profile.frameworks).toContain('GDPR');
+    expect(profile.frameworks).toContain('DORA');
+    expect(profile.frameworks).toContain('NIS2');
+  });
+
+  it('compounds FCA on UK financial', () => {
+    const profile = getRegulatoryCoverage('uk', 'financial');
+    expect(profile.maxPctRevenue).toBe(0.055); // 4% + 1.5%
+    expect(profile.frameworks).toContain('UK GDPR');
+    expect(profile.frameworks).toContain('FCA / PRA');
+  });
+
+  it('returns only base frameworks for geography/industry without overlay', () => {
+    const profile = getRegulatoryCoverage('hk', 'entertainment');
+    expect(profile.maxPctRevenue).toBe(0.005);
+    expect(profile.frameworks).toEqual(['PDPO']);
   });
 
   it('has all 7 threat types in ATTACK_PATTERN_FREQ', () => {

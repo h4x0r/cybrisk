@@ -22,7 +22,7 @@ import {
   PER_RECORD_COST,
   INDUSTRY_AVG_COST,
   COST_MODIFIERS,
-  REGULATORY_EXPOSURE,
+  getRegulatoryCoverage,
   TEF_BY_INDUSTRY,
   BASE_VULNERABILITY,
   REVENUE_MIDPOINTS,
@@ -241,10 +241,10 @@ export function sampleSecondaryLoss(
 ): number {
   const revenue = REVENUE_MIDPOINTS[inputs.company.revenueBand];
 
-  // Regulatory: REGULATORY_EXPOSURE[geography].maxPctRevenue x revenue x PERT(0.01, 0.1, 0.5)
-  const regExposure = REGULATORY_EXPOSURE[inputs.company.geography];
+  // Regulatory: compound exposure (geography + sector) x revenue x PERT(0.01, 0.1, 0.5)
+  const regProfile = getRegulatoryCoverage(inputs.company.geography, inputs.company.industry);
   const regulatory =
-    regExposure.maxPctRevenue * revenue * samplePERT(0.01, 0.1, 0.5, rng);
+    regProfile.maxPctRevenue * revenue * samplePERT(0.01, 0.1, 0.5, rng);
 
   // Litigation: primaryLoss x PERT(0.15, 0.22, 0.30)
   const litigation = primaryLoss * samplePERT(0.15, 0.22, 0.3, rng);
@@ -446,13 +446,19 @@ export function identifyKeyDrivers(inputs: AssessmentInputs): KeyDriver[] {
     });
   }
 
-  // Regulatory geography
-  const regExposure = REGULATORY_EXPOSURE[inputs.company.geography];
-  if (regExposure.maxPctRevenue >= 0.04) {
+  // Regulatory geography + sector compound exposure
+  const regProfile = getRegulatoryCoverage(inputs.company.geography, inputs.company.industry);
+  if (regProfile.maxPctRevenue >= 0.04) {
     drivers.push({
       factor: 'Regulatory Exposure',
       impact: 'HIGH',
-      description: `${regExposure.framework} carries fines up to ${(regExposure.maxPctRevenue * 100).toFixed(0)}% of revenue.`,
+      description: `${regProfile.frameworks.join(' + ')} carries compound fines up to ${(regProfile.maxPctRevenue * 100).toFixed(1)}% of revenue.`,
+    });
+  } else if (regProfile.frameworks.length > 1) {
+    drivers.push({
+      factor: 'Regulatory Exposure',
+      impact: 'MEDIUM',
+      description: `Subject to ${regProfile.frameworks.join(' + ')} with compound fines up to ${(regProfile.maxPctRevenue * 100).toFixed(1)}% of revenue.`,
     });
   }
 

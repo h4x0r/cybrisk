@@ -43,7 +43,7 @@ import {
   PER_RECORD_COST,
   INDUSTRY_AVG_COST,
   COST_MODIFIERS,
-  REGULATORY_EXPOSURE,
+  getRegulatoryCoverage,
   TEF_BY_INDUSTRY,
   REVENUE_MIDPOINTS,
   EMPLOYEE_MULTIPLIERS,
@@ -661,6 +661,7 @@ function buildDocument(
     day: 'numeric',
   });
   const revenue = REVENUE_MIDPOINTS[inputs.company.revenueBand];
+  const regProfile = getRegulatoryCoverage(inputs.company.geography, inputs.company.industry);
 
   // Risk-to-investment ratio
   const ratio = results.gordonLoebSpend > 0
@@ -995,19 +996,19 @@ function buildDocument(
       }),
       new TableRow({
         children: [
-          dataCell('Regulatory Framework'),
-          dataCell(
-            REGULATORY_EXPOSURE[inputs.company.geography]?.framework ?? 'N/A',
-          ),
+          dataCell('Applicable Frameworks'),
+          dataCell(regProfile.frameworks.join(' + ')),
         ],
       }),
       new TableRow({
         children: [
-          dataCell('Max Regulatory Fine Exposure'),
+          dataCell('Compound Regulatory Fine Exposure'),
           dataCell(
-            fmtPct(
-              REGULATORY_EXPOSURE[inputs.company.geography]?.maxPctRevenue ?? 0,
-            ) + ' of revenue',
+            fmtPct(regProfile.maxPctRevenue) + ' of revenue',
+            {
+              bold: true,
+              color: regProfile.maxPctRevenue >= 0.04 ? BRAND_RED : undefined,
+            },
           ),
         ],
       }),

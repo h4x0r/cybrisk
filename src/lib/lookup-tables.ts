@@ -104,7 +104,7 @@ export const CLAIM_SEVERITY = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Regulatory fine exposure by geography
+// Regulatory fine exposure — base geography rate
 // ---------------------------------------------------------------------------
 export const REGULATORY_EXPOSURE: Record<
   Geography,
@@ -117,6 +117,108 @@ export const REGULATORY_EXPOSURE: Record<
   sg: { maxPctRevenue: 0.01, framework: 'PDPA' },
   other: { maxPctRevenue: 0.01, framework: 'Various' },
 };
+
+// ---------------------------------------------------------------------------
+// Sector-specific regulatory overlays (additive on top of geography base)
+//
+// Sources:
+// - HIPAA: up to $2.1M per violation category (HHS OCR enforcement)
+// - DORA: EU 2022/2554, up to 1% avg daily worldwide turnover (Art. 50-51)
+// - NIS2: EU 2022/2555, up to EUR 10M or 2% worldwide turnover (Art. 34)
+// - GLBA/SOX: OCC/FDIC/SEC enforcement actions
+// - FCA: UK Senior Managers & Certification Regime
+// - MAS TRM: MAS Technology Risk Management Guidelines
+// - NERC CIP: up to $1M/day per violation
+// - FERPA: loss of federal funding eligibility
+// - FISMA: OMB/CISA compliance mandates for federal systems
+// ---------------------------------------------------------------------------
+type SectorOverlay = { addPctRevenue: number; framework: string };
+
+const SECTOR_OVERLAYS: Partial<
+  Record<Industry, Partial<Record<Geography, SectorOverlay[]>>>
+> = {
+  healthcare: {
+    us: [{ addPctRevenue: 0.015, framework: 'HIPAA' }],
+    eu: [{ addPctRevenue: 0.01, framework: 'NIS2 (essential entity)' }],
+    uk: [{ addPctRevenue: 0.005, framework: 'NHS DSPT / CQC' }],
+    sg: [{ addPctRevenue: 0.005, framework: 'MOH HCSA' }],
+  },
+  financial: {
+    eu: [
+      { addPctRevenue: 0.015, framework: 'DORA' },
+      { addPctRevenue: 0.005, framework: 'NIS2' },
+    ],
+    uk: [{ addPctRevenue: 0.015, framework: 'FCA / PRA' }],
+    us: [{ addPctRevenue: 0.01, framework: 'GLBA / SOX' }],
+    sg: [{ addPctRevenue: 0.01, framework: 'MAS TRM' }],
+    hk: [{ addPctRevenue: 0.005, framework: 'HKMA CFI' }],
+  },
+  energy: {
+    eu: [{ addPctRevenue: 0.01, framework: 'NIS2 (essential entity)' }],
+    uk: [{ addPctRevenue: 0.005, framework: 'NIS Regulations' }],
+    us: [{ addPctRevenue: 0.005, framework: 'NERC CIP' }],
+  },
+  technology: {
+    eu: [
+      { addPctRevenue: 0.005, framework: 'NIS2' },
+      { addPctRevenue: 0.005, framework: 'EU Cyber Resilience Act' },
+    ],
+    us: [{ addPctRevenue: 0.005, framework: 'FTC Act / CCPA' }],
+  },
+  education: {
+    us: [{ addPctRevenue: 0.005, framework: 'FERPA' }],
+  },
+  communications: {
+    eu: [{ addPctRevenue: 0.005, framework: 'NIS2 / ePrivacy' }],
+    us: [{ addPctRevenue: 0.005, framework: 'FCC Rules' }],
+  },
+  public_sector: {
+    us: [{ addPctRevenue: 0.005, framework: 'FISMA / FedRAMP' }],
+    eu: [{ addPctRevenue: 0.005, framework: 'NIS2' }],
+  },
+  transportation: {
+    eu: [{ addPctRevenue: 0.005, framework: 'NIS2 (essential entity)' }],
+  },
+  retail: {
+    us: [{ addPctRevenue: 0.005, framework: 'CCPA / CPRA' }],
+  },
+  consumer: {
+    us: [{ addPctRevenue: 0.005, framework: 'CCPA / CPRA' }],
+  },
+  pharmaceuticals: {
+    eu: [{ addPctRevenue: 0.005, framework: 'NIS2' }],
+  },
+  industrial: {
+    eu: [{ addPctRevenue: 0.005, framework: 'NIS2' }],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Compound regulatory exposure: geography base + sector overlays
+// ---------------------------------------------------------------------------
+export interface RegulatoryProfile {
+  maxPctRevenue: number;
+  frameworks: string[];
+}
+
+export function getRegulatoryCoverage(
+  geography: Geography,
+  industry: Industry,
+): RegulatoryProfile {
+  const base = REGULATORY_EXPOSURE[geography];
+  const frameworks: string[] = [base.framework];
+  let totalPct = base.maxPctRevenue;
+
+  const overlays = SECTOR_OVERLAYS[industry]?.[geography];
+  if (overlays) {
+    for (const overlay of overlays) {
+      totalPct += overlay.addPctRevenue;
+      frameworks.push(overlay.framework);
+    }
+  }
+
+  return { maxPctRevenue: totalPct, frameworks };
+}
 
 // ---------------------------------------------------------------------------
 // Threat Event Frequency by industry — PERT parameters (events/year)
