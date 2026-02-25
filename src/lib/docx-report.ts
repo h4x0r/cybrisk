@@ -1522,6 +1522,66 @@ function buildDocument(
     );
   }
 
+  // Gordon-Loeb optimal spend callout (mirrors results page)
+  driversChildren.push(
+    new Paragraph({ spacing: { before: 300 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: 'Optimal Security Investment',
+                      bold: true,
+                      size: 20,
+                      color: '22C55E',
+                      font: 'Calibri',
+                    }),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: fmtDollar(results.gordonLoebSpend),
+                      bold: true,
+                      size: 36,
+                      color: '22C55E',
+                      font: 'Calibri',
+                    }),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: 'Gordon-Loeb model: z* \u2264 (1/e) \u00B7 v \u00B7 S',
+                      size: 18,
+                      color: MID_GRAY,
+                      font: 'Calibri',
+                      italics: true,
+                    }),
+                  ],
+                }),
+              ],
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 2, color: '22C55E' },
+                bottom: { style: BorderStyle.SINGLE, size: 2, color: '22C55E' },
+                left: { style: BorderStyle.SINGLE, size: 2, color: '22C55E' },
+                right: { style: BorderStyle.SINGLE, size: 2, color: '22C55E' },
+              },
+              shading: { type: ShadingType.SOLID, color: 'F0FDF4' },
+            }),
+          ],
+        }),
+      ],
+    }),
+  );
+
   driversChildren.push(new Paragraph({ children: [new PageBreak()] }));
 
   // --- Industry Benchmark ---
@@ -1553,6 +1613,51 @@ function buildDocument(
       spacing: { after: 200 },
     }),
   ];
+
+  // Above/Below industry average status badge (mirrors results page)
+  const isAboveMedian = results.industryBenchmark.yourAle > results.industryBenchmark.industryMedian;
+  const statusColor = isAboveMedian ? BRAND_RED : '22C55E';
+  const statusBg = isAboveMedian ? 'FEF2F2' : 'F0FDF4';
+  const statusText = isAboveMedian
+    ? 'Above industry average \u2014 exposure exceeds typical peers'
+    : 'Below industry average \u2014 exposure within typical range';
+
+  benchChildren.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: statusText,
+                      bold: true,
+                      size: 22,
+                      color: statusColor,
+                      font: 'Calibri',
+                    }),
+                  ],
+                  alignment: AlignmentType.CENTER,
+                  spacing: { before: 80, after: 80 },
+                }),
+              ],
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 2, color: statusColor },
+                bottom: { style: BorderStyle.SINGLE, size: 2, color: statusColor },
+                left: { style: BorderStyle.SINGLE, size: 2, color: statusColor },
+                right: { style: BorderStyle.SINGLE, size: 2, color: statusColor },
+              },
+              shading: { type: ShadingType.SOLID, color: statusBg },
+            }),
+          ],
+        }),
+      ],
+    }),
+    new Paragraph({ spacing: { after: 200 } }),
+  );
 
   // Benchmark chart image
   const BENCH_HEIGHT_EMU = Math.round(1.9 * EMU_PER_INCH);
