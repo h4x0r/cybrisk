@@ -154,6 +154,13 @@ export default function StepReview({ data }: StepProps) {
           >
             {'>'} COMPANY
           </div>
+          {company?.organizationName && (
+            <Row
+              label="organization"
+              value={company.organizationName}
+              color="#f0f4ff"
+            />
+          )}
           {company?.industry && (
             <Row
               label="industry"

@@ -109,6 +109,24 @@ export default function StepCompanyProfile({ data, onUpdate }: StepProps) {
         </p>
       </div>
 
+      {/* Organization Name (optional) */}
+      <div className="space-y-2">
+        <label
+          className="text-xs uppercase tracking-wider"
+          style={{ fontFamily: 'var(--font-geist-mono)', color: '#6888aa' }}
+        >
+          Organization Name <span style={{ color: '#4a6080' }}>(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={company.organizationName ?? ''}
+          onChange={(e) => update('organizationName', e.target.value)}
+          placeholder="e.g. Acme Corp"
+          className="w-full px-3 py-2 rounded-md text-sm bg-transparent text-[#f0f4ff] border border-[rgba(0,180,255,0.2)] hover:border-[rgba(0,180,255,0.4)] focus:outline-none focus:ring-1 focus:ring-[rgba(0,180,255,0.3)] placeholder:text-[#4a6080]"
+          style={{ fontFamily: 'var(--font-geist-mono)' }}
+        />
+      </div>
+
       {/* Industry */}
       <div className="space-y-2">
         <label

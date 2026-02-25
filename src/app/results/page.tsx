@@ -43,12 +43,12 @@ export default function ResultsPage() {
     }
   }, [router]);
 
-  const handleExportPDF = useCallback(async () => {
+  const handleExportReport = useCallback(async () => {
     if (!results || !inputs) return;
     setExporting(true);
     try {
-      const { downloadReport } = await import('@/lib/pdf-report');
-      downloadReport(inputs, results);
+      const { downloadReport } = await import('@/lib/docx-report');
+      await downloadReport(inputs, results);
     } finally {
       setExporting(false);
     }
@@ -126,7 +126,7 @@ export default function ResultsPage() {
         <div className="flex justify-center gap-4 mt-8 mb-12">
           {inputs && (
             <button
-              onClick={handleExportPDF}
+              onClick={handleExportReport}
               disabled={exporting}
               className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
               style={{
@@ -136,7 +136,7 @@ export default function ResultsPage() {
                 color: '#ef4444',
               }}
             >
-              {exporting ? 'Generating...' : 'Export PDF Report'}
+              {exporting ? 'Generating...' : 'Export Report (.docx)'}
             </button>
           )}
           <a

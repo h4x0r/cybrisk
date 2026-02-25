@@ -56,6 +56,7 @@ export type IncidentHistory = '0' | '1' | '2_5' | '5_plus';
 export type RiskRating = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 
 export interface CompanyProfile {
+  organizationName?: string;
   industry: Industry;
   revenueBand: RevenueBand;
   employees: EmployeeCount;
