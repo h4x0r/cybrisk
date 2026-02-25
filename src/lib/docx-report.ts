@@ -27,11 +27,18 @@ import {
   Footer,
   PageNumber,
   ExternalHyperlink,
+  ImageRun,
   convertInchesToTwip,
   LevelFormat,
 } from 'docx';
 import { saveAs } from 'file-saver';
-import type { AssessmentInputs, SimulationResults, Industry } from '@/lib/types';
+import type {
+  AssessmentInputs,
+  SimulationResults,
+  Industry,
+  DistributionBucket,
+  ExceedancePoint,
+} from '@/lib/types';
 import {
   PER_RECORD_COST,
   INDUSTRY_AVG_COST,
@@ -142,6 +149,443 @@ const CELL_BORDER = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Chart rendering — Canvas 2D → PNG → Uint8Array for DOCX embedding
+// ---------------------------------------------------------------------------
+const CHART_W = 1200; // 2x retina
+const CHART_H = 520;
+const EMU_PER_INCH = 914400;
+const CHART_WIDTH_EMU = 6 * EMU_PER_INCH; // 6 inches
+const CHART_HEIGHT_EMU = 2.6 * EMU_PER_INCH; // proportional
+
+function canvasToPngBytes(canvas: HTMLCanvasElement): Uint8Array {
+  const dataUrl = canvas.toDataURL('image/png');
+  const raw = atob(dataUrl.split(',')[1]);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+function createCanvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const c = document.createElement('canvas');
+  c.width = CHART_W;
+  c.height = CHART_H;
+  const ctx = c.getContext('2d')!;
+  // White background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, CHART_W, CHART_H);
+  return [c, ctx];
+}
+
+function fmtAxisDollar(n: number): string {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${Math.round(n)}`;
+}
+
+/**
+ * Chart 1: Loss Distribution Histogram
+ * Bar chart from distributionBuckets with ALE mean and P95 reference lines.
+ */
+function renderDistributionChart(
+  buckets: DistributionBucket[],
+  aleMean: number,
+  p95: number,
+): Uint8Array {
+  const [canvas, ctx] = createCanvas();
+  const pad = { top: 60, right: 40, bottom: 80, left: 90 };
+  const plotW = CHART_W - pad.left - pad.right;
+  const plotH = CHART_H - pad.top - pad.bottom;
+
+  // Title
+  ctx.font = 'bold 22px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'center';
+  ctx.fillText('Loss Distribution (10,000 Monte Carlo Simulations)', CHART_W / 2, 36);
+
+  // Find max probability for Y axis
+  const maxProb = Math.max(...buckets.map((b) => b.probability), 0.01);
+  const yMax = Math.ceil(maxProb * 100) / 100; // round up to nearest 1%
+
+  // Grid lines
+  ctx.strokeStyle = '#E8ECF2';
+  ctx.lineWidth = 1;
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = pad.top + plotH - (i / yTicks) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + plotW, y);
+    ctx.stroke();
+
+    // Y axis labels
+    const val = (yMax * i) / yTicks;
+    ctx.font = '14px Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#8899BB';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${(val * 100).toFixed(0)}%`, pad.left - 10, y + 5);
+  }
+
+  // Bars
+  const barGap = 3;
+  const barW = (plotW - barGap * buckets.length) / buckets.length;
+
+  for (let i = 0; i < buckets.length; i++) {
+    const b = buckets[i];
+    const barH = (b.probability / yMax) * plotH;
+    const x = pad.left + i * (barW + barGap);
+    const y = pad.top + plotH - barH;
+
+    // Gradient bar
+    const grad = ctx.createLinearGradient(x, y, x, pad.top + plotH);
+    grad.addColorStop(0, '#00B4FF');
+    grad.addColorStop(1, '#0A1628');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, barW, barH);
+
+    // X axis labels (every other bucket to avoid crowding)
+    if (i % 2 === 0 || buckets.length <= 10) {
+      ctx.save();
+      ctx.translate(x + barW / 2, pad.top + plotH + 12);
+      ctx.rotate(-Math.PI / 4);
+      ctx.font = '11px Calibri, Arial, sans-serif';
+      ctx.fillStyle = '#8899BB';
+      ctx.textAlign = 'right';
+      ctx.fillText(b.rangeLabel, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  // Reference lines: ALE Mean
+  const aleMinVal = buckets[0]?.minValue ?? 0;
+  const aleMaxVal = buckets[buckets.length - 1]?.maxValue ?? 1;
+  const aleRange = aleMaxVal - aleMinVal;
+
+  function lossToX(loss: number): number {
+    const frac = Math.max(0, Math.min(1, (loss - aleMinVal) / aleRange));
+    return pad.left + frac * plotW;
+  }
+
+  // ALE Mean line
+  const aleX = lossToX(aleMean);
+  ctx.setLineDash([8, 4]);
+  ctx.strokeStyle = '#EF4444';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(aleX, pad.top);
+  ctx.lineTo(aleX, pad.top + plotH);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+  ctx.font = 'bold 13px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#EF4444';
+  ctx.textAlign = 'left';
+  ctx.fillText(`ALE: ${fmtAxisDollar(aleMean)}`, aleX + 6, pad.top + 16);
+
+  // P95 line
+  const p95X = lossToX(p95);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#F97316';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p95X, pad.top);
+  ctx.lineTo(p95X, pad.top + plotH);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+  ctx.font = 'bold 13px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#F97316';
+  ctx.textAlign = 'left';
+  ctx.fillText(`P95: ${fmtAxisDollar(p95)}`, p95X + 6, pad.top + 34);
+
+  // Axes
+  ctx.strokeStyle = '#0A1628';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.stroke();
+
+  // Y axis title
+  ctx.save();
+  ctx.translate(20, pad.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font = 'bold 14px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#4A6080';
+  ctx.textAlign = 'center';
+  ctx.fillText('Probability', 0, 0);
+  ctx.restore();
+
+  // Footnote
+  ctx.font = '11px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#AABBCC';
+  ctx.textAlign = 'center';
+  ctx.fillText('FAIR Monte Carlo Simulation | N=10,000 | CybRisk', CHART_W / 2, CHART_H - 6);
+
+  return canvasToPngBytes(canvas);
+}
+
+/**
+ * Chart 2: Loss Exceedance Curve (complementary CDF)
+ * Shows probability that annual losses exceed a given threshold.
+ */
+function renderExceedanceChart(
+  curve: ExceedancePoint[],
+  aleMean: number,
+  p95: number,
+  gordonLoeb: number,
+): Uint8Array {
+  const [canvas, ctx] = createCanvas();
+  const pad = { top: 60, right: 40, bottom: 60, left: 90 };
+  const plotW = CHART_W - pad.left - pad.right;
+  const plotH = CHART_H - pad.top - pad.bottom;
+
+  // Title
+  ctx.font = 'bold 22px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'center';
+  ctx.fillText('Loss Exceedance Curve', CHART_W / 2, 36);
+
+  // Data ranges
+  const lossMax = curve.length > 0 ? curve[curve.length - 1].loss : 1;
+  const lossMin = 0;
+
+  function xPos(loss: number): number {
+    return pad.left + (loss / lossMax) * plotW;
+  }
+  function yPos(prob: number): number {
+    return pad.top + plotH - prob * plotH;
+  }
+
+  // Grid
+  ctx.strokeStyle = '#E8ECF2';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + plotH - (i / 5) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + plotW, y);
+    ctx.stroke();
+    ctx.font = '14px Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#8899BB';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${(i * 20)}%`, pad.left - 10, y + 5);
+  }
+
+  // X axis labels
+  const xTicks = 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const loss = (lossMax * i) / xTicks;
+    const x = xPos(loss);
+    ctx.font = '12px Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#8899BB';
+    ctx.textAlign = 'center';
+    ctx.fillText(fmtAxisDollar(loss), x, pad.top + plotH + 22);
+  }
+
+  // Area fill under curve
+  if (curve.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(xPos(curve[0].loss), yPos(curve[0].probability));
+    for (const pt of curve) {
+      ctx.lineTo(xPos(pt.loss), yPos(pt.probability));
+    }
+    ctx.lineTo(xPos(curve[curve.length - 1].loss), yPos(0));
+    ctx.lineTo(xPos(curve[0].loss), yPos(0));
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
+    grad.addColorStop(0, 'rgba(0,180,255,0.25)');
+    grad.addColorStop(1, 'rgba(10,22,40,0.05)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Curve line
+  if (curve.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(xPos(curve[0].loss), yPos(curve[0].probability));
+    for (const pt of curve) {
+      ctx.lineTo(xPos(pt.loss), yPos(pt.probability));
+    }
+    ctx.strokeStyle = '#00B4FF';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
+  // Reference: ALE Mean
+  ctx.setLineDash([8, 4]);
+  ctx.strokeStyle = '#EF4444';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(xPos(aleMean), pad.top);
+  ctx.lineTo(xPos(aleMean), pad.top + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = 'bold 12px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#EF4444';
+  ctx.textAlign = 'left';
+  ctx.fillText(`ALE ${fmtAxisDollar(aleMean)}`, xPos(aleMean) + 5, pad.top + 16);
+
+  // Reference: P95
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#F97316';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(xPos(p95), pad.top);
+  ctx.lineTo(xPos(p95), pad.top + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = 'bold 12px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#F97316';
+  ctx.textAlign = 'left';
+  ctx.fillText(`PML\u2089\u2085 ${fmtAxisDollar(p95)}`, xPos(p95) + 5, pad.top + 34);
+
+  // Reference: Gordon-Loeb optimal spend
+  if (gordonLoeb > 0 && gordonLoeb < lossMax) {
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = '#22C55E';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(xPos(gordonLoeb), pad.top);
+    ctx.lineTo(xPos(gordonLoeb), pad.top + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '11px Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#22C55E';
+    ctx.textAlign = 'left';
+    ctx.fillText(`GL Spend ${fmtAxisDollar(gordonLoeb)}`, xPos(gordonLoeb) + 5, pad.top + 52);
+  }
+
+  // Axes
+  ctx.strokeStyle = '#0A1628';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.stroke();
+
+  // Axis titles
+  ctx.save();
+  ctx.translate(20, pad.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font = 'bold 14px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#4A6080';
+  ctx.textAlign = 'center';
+  ctx.fillText('P(Loss > x)', 0, 0);
+  ctx.restore();
+
+  ctx.font = 'bold 14px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#4A6080';
+  ctx.textAlign = 'center';
+  ctx.fillText('Annual Loss Threshold', pad.left + plotW / 2, pad.top + plotH + 48);
+
+  return canvasToPngBytes(canvas);
+}
+
+/**
+ * Chart 3: Industry Benchmark Comparison
+ * Horizontal bar chart — your ALE vs industry median.
+ */
+function renderBenchmarkChart(
+  yourAle: number,
+  industryMedian: number,
+  industryName: string,
+): Uint8Array {
+  const [canvas, ctx] = createCanvas();
+  canvas.height = 380;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, CHART_W, 380);
+
+  const pad = { top: 60, right: 80, bottom: 50, left: 260 };
+  const plotW = CHART_W - pad.left - pad.right;
+  const plotH = 380 - pad.top - pad.bottom;
+
+  // Title
+  ctx.font = 'bold 22px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Risk Exposure vs ${industryName} Median`, CHART_W / 2, 36);
+
+  const maxVal = Math.max(yourAle, industryMedian) * 1.25;
+  const barH = 50;
+  const gap = 40;
+
+  // Grid
+  for (let i = 0; i <= 4; i++) {
+    const x = pad.left + (i / 4) * plotW;
+    ctx.strokeStyle = '#E8ECF2';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + plotH);
+    ctx.stroke();
+    ctx.font = '13px Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#8899BB';
+    ctx.textAlign = 'center';
+    ctx.fillText(fmtAxisDollar((maxVal * i) / 4), x, pad.top + plotH + 22);
+  }
+
+  // Bar: Your ALE
+  const y1 = pad.top + (plotH / 2 - barH - gap / 2);
+  const w1 = (yourAle / maxVal) * plotW;
+  const grad1 = ctx.createLinearGradient(pad.left, y1, pad.left + w1, y1);
+  grad1.addColorStop(0, '#0A1628');
+  grad1.addColorStop(1, yourAle > industryMedian ? '#EF4444' : '#00B4FF');
+  ctx.fillStyle = grad1;
+  ctx.beginPath();
+  ctx.roundRect(pad.left, y1, w1, barH, [0, 6, 6, 0]);
+  ctx.fill();
+
+  ctx.font = 'bold 15px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'right';
+  ctx.fillText('Your Estimated ALE', pad.left - 14, y1 + barH / 2 + 5);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = yourAle > industryMedian ? '#EF4444' : '#00B4FF';
+  ctx.fillText(fmtAxisDollar(yourAle), pad.left + w1 + 10, y1 + barH / 2 + 5);
+
+  // Bar: Industry Median
+  const y2 = pad.top + (plotH / 2 + gap / 2);
+  const w2 = (industryMedian / maxVal) * plotW;
+  const grad2 = ctx.createLinearGradient(pad.left, y2, pad.left + w2, y2);
+  grad2.addColorStop(0, '#0A1628');
+  grad2.addColorStop(1, '#8899BB');
+  ctx.fillStyle = grad2;
+  ctx.beginPath();
+  ctx.roundRect(pad.left, y2, w2, barH, [0, 6, 6, 0]);
+  ctx.fill();
+
+  ctx.font = 'bold 15px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${industryName} Median`, pad.left - 14, y2 + barH / 2 + 5);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#8899BB';
+  ctx.fillText(fmtAxisDollar(industryMedian), pad.left + w2 + 10, y2 + barH / 2 + 5);
+
+  // Variance annotation
+  const pctDiff = ((yourAle - industryMedian) / industryMedian) * 100;
+  const sign = pctDiff >= 0 ? '+' : '';
+  ctx.font = 'bold 16px Calibri, Arial, sans-serif';
+  ctx.fillStyle = pctDiff >= 0 ? '#EF4444' : '#22C55E';
+  ctx.textAlign = 'center';
+  ctx.fillText(
+    `${sign}${pctDiff.toFixed(0)}% vs industry median`,
+    pad.left + plotW / 2,
+    pad.top + plotH + 42,
+  );
+
+  return canvasToPngBytes(canvas);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: create styled table cells
 // ---------------------------------------------------------------------------
 function headerCell(text: string, widthPct?: number): TableCell {
@@ -197,9 +641,16 @@ function dataCell(
 // ---------------------------------------------------------------------------
 // Build the DOCX Document
 // ---------------------------------------------------------------------------
+interface ChartImages {
+  distribution: Uint8Array;
+  exceedance: Uint8Array;
+  benchmark: Uint8Array;
+}
+
 function buildDocument(
   inputs: AssessmentInputs,
   results: SimulationResults,
+  charts: ChartImages,
 ): Document {
   const orgName =
     inputs.company.organizationName?.trim() || 'Acme Corp';
@@ -421,6 +872,71 @@ function buildDocument(
         }),
       ],
       spacing: { after: 200 },
+    }),
+  );
+
+  // --- Charts: Distribution + Exceedance ---
+  execSummaryChildren.push(
+    new Paragraph({ spacing: { before: 300 } }),
+    new Paragraph({
+      text: 'Loss Distribution',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { after: 100 },
+    }),
+    new Paragraph({
+      children: [
+        new ImageRun({
+          type: 'png',
+          data: charts.distribution,
+          transformation: {
+            width: CHART_WIDTH_EMU,
+            height: CHART_HEIGHT_EMU,
+          },
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Figure 1: Probability distribution of annual losses across 10,000 simulated scenarios. Red dashed line indicates the mean ALE; orange dashed line marks the 95th percentile (probable maximum loss).',
+          size: 18,
+          color: MID_GRAY,
+          font: 'Calibri',
+          italics: true,
+        }),
+      ],
+      spacing: { before: 60, after: 300 },
+    }),
+    new Paragraph({
+      text: 'Loss Exceedance Curve',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { after: 100 },
+    }),
+    new Paragraph({
+      children: [
+        new ImageRun({
+          type: 'png',
+          data: charts.exceedance,
+          transformation: {
+            width: CHART_WIDTH_EMU,
+            height: CHART_HEIGHT_EMU,
+          },
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Figure 2: Complementary cumulative distribution function showing the probability that annual losses exceed a given threshold. Directly informs cyber insurance limit selection and risk appetite statements.',
+          size: 18,
+          color: MID_GRAY,
+          font: 'Calibri',
+          italics: true,
+        }),
+      ],
+      spacing: { before: 60, after: 200 },
     }),
     new Paragraph({
       children: [new PageBreak()],
@@ -768,6 +1284,36 @@ function buildDocument(
       spacing: { after: 200 },
     }),
   ];
+
+  // Benchmark chart image
+  const BENCH_HEIGHT_EMU = Math.round(1.9 * EMU_PER_INCH);
+  benchChildren.push(
+    new Paragraph({
+      children: [
+        new ImageRun({
+          type: 'png',
+          data: charts.benchmark,
+          transformation: {
+            width: CHART_WIDTH_EMU,
+            height: BENCH_HEIGHT_EMU,
+          },
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Figure 3: Comparison of estimated annualised loss expectancy against the industry median, derived from IBM Cost of a Data Breach Report 2025.',
+          size: 18,
+          color: MID_GRAY,
+          font: 'Calibri',
+          italics: true,
+        }),
+      ],
+      spacing: { before: 60, after: 300 },
+    }),
+  );
 
   // Industry cost table (from IBM data)
   const industryRows = [
@@ -1280,7 +1826,27 @@ export async function downloadReport(
   inputs: AssessmentInputs,
   results: SimulationResults,
 ): Promise<void> {
-  const doc = buildDocument(inputs, results);
+  // Pre-render charts on Canvas → PNG
+  const charts: ChartImages = {
+    distribution: renderDistributionChart(
+      results.distributionBuckets,
+      results.ale.mean,
+      results.ale.p95,
+    ),
+    exceedance: renderExceedanceChart(
+      results.exceedanceCurve,
+      results.ale.mean,
+      results.ale.p95,
+      results.gordonLoebSpend,
+    ),
+    benchmark: renderBenchmarkChart(
+      results.industryBenchmark.yourAle,
+      results.industryBenchmark.industryMedian,
+      INDUSTRY_NAMES[inputs.company.industry],
+    ),
+  };
+
+  const doc = buildDocument(inputs, results, charts);
   const blob = await Packer.toBlob(doc);
 
   const orgSlug = (inputs.company.organizationName ?? 'acme-corp')
