@@ -250,9 +250,12 @@ export default function LandingPage() {
         {/* ─── Chart Card ──────────────────────────────────── */}
         <section className="container mx-auto px-6 py-20">
           <div
-            className="animate-fade-up max-w-5xl mx-auto rounded-2xl p-6 md:p-8 relative animate-border-glow"
+            className="animate-fade-up max-w-5xl mx-auto"
+            style={{ animationDelay: '900ms' }}
+          >
+          <div
+            className="rounded-2xl p-6 md:p-8 relative animate-border-glow"
             style={{
-              animationDelay: '900ms',
               background: 'rgba(4, 8, 28, 0.92)',
               border: '1px solid rgba(0,180,255,0.18)',
               backdropFilter: 'blur(18px)',
@@ -357,6 +360,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </section>
 
