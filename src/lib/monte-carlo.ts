@@ -574,7 +574,7 @@ export function generateRecommendations(
 // ---------------------------------------------------------------------------
 export function simulate(
   inputs: AssessmentInputs,
-  iterations: number = 10_000,
+  iterations: number = 100_000,
   rng: RNG = Math.random,
 ): SimulationResults {
   const losses: number[] = [];

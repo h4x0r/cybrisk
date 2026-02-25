@@ -227,9 +227,9 @@ const PHASE_COLORS: Array<{
   low: [number, number, number];
   high: [number, number, number];
 }> = [
-  { low: hexToRgb('#001838'), high: hexToRgb('#0088ff') }, // cool blues
-  { low: hexToRgb('#003060'), high: hexToRgb('#00ffcc') }, // cyan transition
-  { low: hexToRgb('#402000'), high: hexToRgb('#ef4444') }, // warm crimson
+  { low: hexToRgb('#1a0a00'), high: hexToRgb('#ff6600') }, // deep amber
+  { low: hexToRgb('#1a1000'), high: hexToRgb('#ffaa00') }, // golden transition
+  { low: hexToRgb('#0a1a00'), high: hexToRgb('#00ff44') }, // terminal green finish
 ];
 
 function getPhaseColors(

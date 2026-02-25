@@ -201,7 +201,7 @@ function renderDistributionChart(
   ctx.font = 'bold 22px Calibri, Arial, sans-serif';
   ctx.fillStyle = '#0A1628';
   ctx.textAlign = 'center';
-  ctx.fillText('Loss Distribution (10,000 Monte Carlo Simulations)', CHART_W / 2, 36);
+  ctx.fillText('Loss Distribution (100,000 Monte Carlo Simulations)', CHART_W / 2, 36);
 
   // Find max probability for Y axis
   const maxProb = Math.max(...buckets.map((b) => b.probability), 0.01);
@@ -322,7 +322,7 @@ function renderDistributionChart(
   ctx.font = '11px Calibri, Arial, sans-serif';
   ctx.fillStyle = '#AABBCC';
   ctx.textAlign = 'center';
-  ctx.fillText('FAIR Monte Carlo Simulation | N=10,000 | CybRisk', CHART_W / 2, CHART_H - 6);
+  ctx.fillText('FAIR Monte Carlo Simulation | N=100,000 | CybRisk', CHART_W / 2, CHART_H - 6);
 
   return canvasToPngBytes(canvas);
 }
@@ -965,7 +965,7 @@ function buildDocument(
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Quantitative risk analysis using FAIR methodology with 10,000 Monte Carlo simulations. ',
+          text: 'Quantitative risk analysis using FAIR methodology with 100,000 Monte Carlo simulations. ',
           size: 20,
           color: '666666',
           font: 'Calibri',
@@ -996,7 +996,7 @@ function buildDocument(
     new Paragraph({
       children: [
         new TextRun({
-          text: `This report presents the results of a quantitative cyber risk assessment for ${orgName}, operating in the ${industry} sector. The analysis employs Factor Analysis of Information Risk (FAIR) methodology with 10,000 Monte Carlo simulations to estimate annualised loss exposure.`,
+          text: `This report presents the results of a quantitative cyber risk assessment for ${orgName}, operating in the ${industry} sector. The analysis employs Factor Analysis of Information Risk (FAIR) methodology with 100,000 Monte Carlo simulations to estimate annualised loss exposure.`,
           size: 22,
           font: 'Calibri',
         }),
@@ -1139,7 +1139,7 @@ function buildDocument(
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Figure 1: Probability distribution of annual losses across 10,000 simulated scenarios. Red dashed line indicates the mean ALE; orange dashed line marks the 95th percentile (probable maximum loss).',
+          text: 'Figure 1: Probability distribution of annual losses across 100,000 simulated scenarios. Red dashed line indicates the mean ALE; orange dashed line marks the 95th percentile (probable maximum loss).',
           size: 18,
           color: MID_GRAY,
           font: 'Calibri',
@@ -1773,7 +1773,7 @@ function buildDocument(
     new Paragraph({
       children: [
         new TextRun({
-          text: '10,000 independent trials were executed. Each trial samples:',
+          text: '100,000 independent trials were executed. Each trial samples:',
           size: 22,
           font: 'Calibri',
         }),

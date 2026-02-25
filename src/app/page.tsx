@@ -16,7 +16,7 @@ const FORMULAS = [
 ];
 
 const TRUST_STATS = [
-  { val: '10,000', label: 'MC Simulations', color: '#00d4ff' },
+  { val: '100,000', label: 'MC Simulations', color: '#00d4ff' },
   { val: 'IBM 2024', label: '$4.88M μ_breach', color: '#a0d0ff' },
   { val: 'Verizon DBIR', label: 'Threat Frequencies', color: '#a0d0ff' },
   { val: 'NetDiligence', label: 'Cyber Claims Data', color: '#a0d0ff' },
@@ -34,10 +34,10 @@ const PAIN_POINTS = [
     color: '#ef4444',
   },
   {
-    stat: '10,000',
+    stat: '100,000',
     statLabel: 'simulations',
     claim: 'Actuarial proof, not opinions',
-    body: 'Every estimate is backed by 10,000 Monte Carlo trials using IBM, Verizon DBIR, and NetDiligence cyber claims data. Poisson frequencies. Log-normal severities. Real math.',
+    body: 'Every estimate is backed by 100,000 Monte Carlo trials using IBM, Verizon DBIR, and NetDiligence cyber claims data. Poisson frequencies. Log-normal severities. Real math.',
     formula: 'σ²_ALE = Σ σ²_LM · λ',
     color: '#00d4ff',
   },
@@ -112,7 +112,7 @@ export default function LandingPage() {
               className="text-[#6899cc] text-[11px] tracking-[0.15em] uppercase"
               style={{ fontFamily: 'var(--font-geist-mono)' }}
             >
-              FAIR™ · Monte Carlo · N=10,000 · IBM + DBIR + NetDiligence
+              FAIR™ · Monte Carlo · N=100,000 · IBM + DBIR + NetDiligence
             </span>
           </div>
 

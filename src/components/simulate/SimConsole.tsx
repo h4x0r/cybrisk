@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { AssessmentInputs, SimulationResults } from '@/lib/types';
 import type { Industry } from '@/lib/types';
 import { simulate } from '@/lib/monte-carlo';
-import { TEF_BY_INDUSTRY, COST_MODIFIERS } from '@/lib/lookup-tables';
+import { TEF_BY_INDUSTRY, COST_MODIFIERS, EMPLOYEE_MULTIPLIERS, REVENUE_MIDPOINTS } from '@/lib/lookup-tables';
 
 // ---------------------------------------------------------------------------
 // Human-readable industry names
@@ -29,6 +29,23 @@ const INDUSTRY_NAMES: Record<Industry, string> = {
   public_sector: 'Public Sector',
 };
 
+const REVENUE_LABELS: Record<string, string> = {
+  under_50m: '<$50M',
+  '50m_250m': '$50M-$250M',
+  '250m_1b': '$250M-$1B',
+  '1b_5b': '$1B-$5B',
+  over_5b: '$5B+',
+};
+
+const GEO_LABELS: Record<string, string> = {
+  us: 'US',
+  uk: 'UK',
+  eu: 'EU',
+  hk: 'HK',
+  sg: 'SG',
+  other: 'INTL',
+};
+
 // ---------------------------------------------------------------------------
 // Format helpers
 // ---------------------------------------------------------------------------
@@ -38,67 +55,55 @@ function fmtNumber(n: number): string {
 
 function fmtDollar(n: number): string {
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
   return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
+function fmtDollarCompact(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return `${Math.round(n)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Non-linear progress curve: fast start, slow middle, fast finish
-// Maps elapsed time fraction [0,1] to display percentage [0,100]
 // ---------------------------------------------------------------------------
 function progressCurve(t: number): number {
-  // Piecewise cubic: fast 0-30%, slow 30-70%, fast 70-100%
   if (t < 0.3) {
-    // 0→30% in first 30% of time (linear)
     return (t / 0.3) * 30;
   } else if (t < 0.75) {
-    // 30→70% in middle 45% of time (slow grind)
     const localT = (t - 0.3) / 0.45;
     return 30 + localT * 40;
   } else {
-    // 70→100% in final 25% of time (fast finish)
     const localT = (t - 0.75) / 0.25;
     return 70 + localT * 30;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Stochastic stutter: apply random jitter to progress, occasionally regress
+// Stochastic stutter
 // ---------------------------------------------------------------------------
 function applyStutter(
   basePct: number,
   prevPct: number,
   rng: () => number,
 ): number {
-  // Small random jitter: +-1.5%
   const jitter = (rng() - 0.5) * 3;
   let pct = basePct + jitter;
 
-  // Deliberate regression zone around 52-58%: sometimes drop back
   if (basePct >= 52 && basePct <= 56 && rng() < 0.3) {
-    pct = prevPct - (0.5 + rng() * 2.5); // drop 0.5-3%
+    pct = prevPct - (0.5 + rng() * 2.5);
   }
 
-  // Never go below previous minimum floor or above 99
   pct = Math.max(prevPct - 3, Math.min(99, pct));
 
-  // Always advance at least slightly on average (prevent permanent stall)
   if (pct <= prevPct && basePct > prevPct + 1) {
     pct = prevPct + 0.1;
   }
 
   return Math.round(pct);
-}
-
-// ---------------------------------------------------------------------------
-// Progress bar renderer
-// ---------------------------------------------------------------------------
-function renderProgressBar(pct: number): string {
-  const totalBlocks = 32;
-  const filled = Math.round((pct / 100) * totalBlocks);
-  const empty = totalBlocks - filled;
-  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty) + ` ${pct}%`;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,25 +116,28 @@ interface SimConsoleProps {
 }
 
 // ---------------------------------------------------------------------------
-// SimConsole component — theatrical pacing for credibility
+// Bloomberg-style SimConsole
 // ---------------------------------------------------------------------------
 export default function SimConsole({
   inputs,
   onComplete,
   onProgress,
 }: SimConsoleProps) {
-  const [visibleLines, setVisibleLines] = useState<string[]>([]);
+  const [logLines, setLogLines] = useState<string[]>([]);
   const [progressPct, setProgressPct] = useState<number | null>(null);
   const [isComplete, setIsComplete] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [results, setResults] = useState<SimulationResults | null>(null);
+  const [phase, setPhase] = useState<'INIT' | 'SIM' | 'POST' | 'DONE'>('INIT');
+  const [iterCount, setIterCount] = useState(0);
+  const logRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
-  // Auto-scroll to bottom
+  // Auto-scroll log
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [visibleLines, progressPct]);
+  }, [logLines, progressPct]);
 
   const runSequence = useCallback(async () => {
     if (hasStartedRef.current) return;
@@ -138,32 +146,27 @@ export default function SimConsole({
     const industry = INDUSTRY_NAMES[inputs.company.industry];
     const tef = TEF_BY_INDUSTRY[inputs.company.industry];
 
-    // Build active controls description
     const controls: string[] = [];
     if (inputs.controls.irPlan)
-      controls.push(`IR Plan (${Math.round(COST_MODIFIERS.ir_plan * 100)}%)`);
+      controls.push(`IRP(${Math.round(COST_MODIFIERS.ir_plan * 100)}%)`);
     if (inputs.controls.mfa)
-      controls.push(`MFA (${Math.round(COST_MODIFIERS.mfa * 100)}%)`);
+      controls.push(`MFA(${Math.round(COST_MODIFIERS.mfa * 100)}%)`);
     if (inputs.controls.securityTeam)
-      controls.push(`CISO (${Math.round(COST_MODIFIERS.security_team * 100)}%)`);
+      controls.push(`CISO(${Math.round(COST_MODIFIERS.security_team * 100)}%)`);
     if (inputs.controls.pentest)
-      controls.push(`Pentest (${Math.round(COST_MODIFIERS.pentest * 100)}%)`);
+      controls.push(`PNTS(${Math.round(COST_MODIFIERS.pentest * 100)}%)`);
     if (inputs.controls.aiAutomation)
-      controls.push(`AI/ML (${Math.round(COST_MODIFIERS.ai_automation * 100)}%)`);
+      controls.push(`AI/ML(${Math.round(COST_MODIFIERS.ai_automation * 100)}%)`);
 
-    const dataTypeCount = inputs.data.dataTypes.length;
-
-    // Helper: delay with random variance
     function delay(base: number, variance: number = 0): Promise<void> {
       const ms = base + (variance > 0 ? Math.random() * variance : 0);
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     function addLine(text: string) {
-      setVisibleLines((prev) => [...prev, text]);
+      setLogLines((prev) => [...prev, text]);
     }
 
-    // Simple seeded RNG for stutter consistency
     let seed = 42;
     const rng = () => {
       seed = (seed * 1664525 + 1013904223) & 0xffffffff;
@@ -171,238 +174,559 @@ export default function SimConsole({
     };
 
     // =====================================================================
-    // PHASE 1: Parameter Loading (0-15%, ~2.5s)
+    // PHASE 1: Parameter Loading
     // =====================================================================
+    setPhase('INIT');
     onProgress?.(0.02);
 
-    addLine('\u25b8 Initialising FAIR risk quantification engine...');
-    await delay(500, 200);
-
-    addLine(`\u25b8 Loading actuarial parameters for ${industry}...`);
+    addLine('CYBRISK FAIR ENGINE v2.1 INITIALISED');
     await delay(400, 150);
 
-    addLine(`\u25b8 Industry baseline: TEF \u03BB=${tef.mode.toFixed(2)}/yr [${tef.min.toFixed(2)}, ${tef.max.toFixed(1)}]`);
+    addLine(`LOADING ${industry.toUpperCase()} ACTUARIAL PARAMS...`);
     await delay(350, 100);
+
+    addLine(`TEF BASELINE: \u03BB=${tef.mode.toFixed(2)}/yr PERT[${tef.min.toFixed(2)},${tef.max.toFixed(1)}]`);
+    await delay(300, 80);
 
     if (controls.length > 0) {
-      addLine(`\u25b8 Adjusting vulnerability: ${controls.join(', ')}`);
+      addLine(`VULN ADJ: ${controls.join(' ')}`);
     } else {
-      addLine('\u25b8 No security controls detected \u2014 using base vulnerability rate 0.30');
+      addLine('VULN ADJ: NONE \u2014 BASE RATE 0.30');
     }
-    await delay(350, 100);
+    await delay(300, 80);
 
     addLine(
-      `\u25b8 Data profile: ${fmtNumber(inputs.data.recordCount)} records, ${dataTypeCount} type${dataTypeCount !== 1 ? 's' : ''}, ${inputs.data.cloudPercentage}% cloud`,
+      `DATA: ${fmtNumber(inputs.data.recordCount)} RECS ${inputs.data.dataTypes.length} TYPES ${inputs.data.cloudPercentage}% CLOUD`,
     );
-    await delay(300, 100);
+    await delay(250, 80);
 
-    addLine('\u25b8 Calibrating PERT distributions against DBIR 2025 baseline...');
-    await delay(450, 200);
+    addLine('PERT CALIBRATION AGAINST DBIR 2025... OK');
+    await delay(350, 150);
 
     onProgress?.(0.15);
 
     // =====================================================================
-    // PHASE 2: Monte Carlo Execution (15-82%, ~6s with stuttering)
+    // PHASE 2: Monte Carlo Execution
     // =====================================================================
-    addLine('\u25b8 Running Monte Carlo simulation (N=10,000)...');
-    await delay(300, 100);
+    setPhase('SIM');
+    addLine('MONTE CARLO N=100,000 BEGIN');
+    await delay(250, 80);
 
-    // Start actual simulation in background
     const simPromise = new Promise<SimulationResults>((resolve) => {
       setTimeout(() => resolve(simulate(inputs)), 50);
     });
 
-    // Animate progress bar over ~6 seconds with non-linear curve + stutter
     const SIM_DURATION_MS = 6000;
-    const FRAME_INTERVAL = 80; // ~12.5fps
+    const FRAME_INTERVAL = 80;
     const totalFrames = Math.floor(SIM_DURATION_MS / FRAME_INTERVAL);
     let displayPct = 0;
     let prevDisplayPct = 0;
 
-    // Milestone log lines at specific percentages
     const milestones: Record<number, string> = {
-      20: `\u25b8 Iteration 2,500 / 10,000 \u2014 sampling TEF\u00D7Vuln matrix...`,
-      38: `\u25b8 Iteration 4,000 / 10,000 \u2014 convergence check: \u03B4=0.${Math.round(20 + Math.random() * 15)}`,
-      52: `\u25b8 Recalibrating tail distribution \u2014 heavy-tailed scenario detected`,
-      65: `\u25b8 Iteration 7,500 / 10,000 \u2014 bootstrap resampling 95th bound...`,
-      78: `\u25b8 Iteration 10,000 / 10,000 \u2014 finalising loss distribution`,
+      15: `ITER 15,000/100K \u2014 SAMPLING TEF\u00D7VULN MATRIX`,
+      30: `ITER 30,000/100K \u2014 CONVERGENCE \u03B4=0.0${Math.round(20 + Math.random() * 15)}`,
+      45: `ITER 45,000/100K \u2014 TAIL CALIBRATION`,
+      55: `RECALIBRATE SEVERITY DIST \u2014 HEAVY-TAIL DETECTED`,
+      70: `ITER 75,000/100K \u2014 BOOTSTRAP P95/P99 BOUND`,
+      85: `ITER 100,000/100K \u2014 FINALISING`,
     };
     const emittedMilestones = new Set<number>();
 
     for (let frame = 0; frame <= totalFrames; frame++) {
-      const t = frame / totalFrames; // 0 → 1
+      const t = frame / totalFrames;
       const basePct = progressCurve(t);
       displayPct = applyStutter(basePct, prevDisplayPct, rng);
 
-      // Clamp: progress should generally advance
       if (displayPct < prevDisplayPct - 3) displayPct = prevDisplayPct - 3;
       displayPct = Math.max(0, Math.min(99, displayPct));
 
       setProgressPct(displayPct);
+      setIterCount(Math.round((displayPct / 100) * 100000));
       onProgress?.(0.15 + (displayPct / 100) * 0.67);
 
-      // Check milestones
       for (const [threshold, line] of Object.entries(milestones)) {
-        const t = Number(threshold);
-        if (displayPct >= t && !emittedMilestones.has(t)) {
-          emittedMilestones.add(t);
+        const th = Number(threshold);
+        if (displayPct >= th && !emittedMilestones.has(th)) {
+          emittedMilestones.add(th);
           addLine(line);
         }
       }
 
       prevDisplayPct = displayPct;
 
-      // Random stall: occasionally pause longer
       if (rng() < 0.05 && displayPct > 15 && displayPct < 85) {
-        await delay(FRAME_INTERVAL + 200, 300); // stall 280-580ms
+        await delay(FRAME_INTERVAL + 200, 300);
       } else {
         await delay(FRAME_INTERVAL, 20);
       }
     }
 
-    // Wait for actual simulation to complete (should be done by now)
-    const results = await simPromise;
+    const simResults = await simPromise;
 
-    // Snap to 100%
     setProgressPct(100);
+    setIterCount(100000);
     onProgress?.(0.82);
     await delay(400);
     setProgressPct(null);
 
     // =====================================================================
-    // PHASE 3: Post-Processing (82-100%, ~2.5s)
+    // PHASE 3: Post-Processing
     // =====================================================================
-    addLine('\u25b8 Computing loss exceedance curve (50-point interpolation)...');
-    await delay(500, 200);
+    setPhase('POST');
+    addLine('COMPUTING EXCEEDANCE CURVE (50-PT INTERP)...');
+    await delay(450, 150);
 
-    addLine('\u25b8 Fitting Gordon-Loeb optimal spend model (1/e coefficient)...');
-    await delay(450, 200);
-
-    addLine('\u25b8 Validating results against industry benchmarks...');
+    addLine('GORDON-LOEB OPTIMAL z* = (1/e)\u00B7v\u00B7S...');
     await delay(400, 150);
 
-    addLine('\u25b8 Generating risk drivers and recommendations...');
+    addLine('BENCHMARK VS INDUSTRY MEDIAN...');
     await delay(350, 100);
+
+    addLine('RISK DRIVERS + RECOMMENDATIONS...');
+    await delay(300, 80);
 
     onProgress?.(1);
 
     // =====================================================================
     // COMPLETE
     // =====================================================================
-    addLine(`\u2713 SIMULATION COMPLETE`);
-    await delay(250);
-
-    // Summary line with actual results
-    addLine(
-      `  ALE: ${fmtDollar(results.ale.mean)} | PML\u2089\u2085: ${fmtDollar(results.ale.p95)} | Risk: ${results.riskRating}`,
-    );
-
+    setPhase('DONE');
+    addLine('SIMULATION COMPLETE');
+    setResults(simResults);
     setIsComplete(true);
 
-    // Wait then navigate
-    await delay(1800);
-    onComplete(results);
+    await delay(2200);
+    onComplete(simResults);
   }, [inputs, onComplete, onProgress]);
 
   useEffect(() => {
     runSequence();
   }, [runSequence]);
 
+  const industry = INDUSTRY_NAMES[inputs.company.industry];
+  const revenue = REVENUE_MIDPOINTS[inputs.company.revenueBand];
+  const empMult = EMPLOYEE_MULTIPLIERS[inputs.company.employees];
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
   return (
     <div
-      className="animate-fade-up w-full max-w-[660px] rounded-xl overflow-hidden"
+      className="animate-fade-up w-full max-w-[820px] overflow-hidden"
       style={{
-        background: 'rgba(4,8,28,0.94)',
-        border: '1px solid rgba(0,180,255,0.2)',
-        backdropFilter: 'blur(24px)',
-        boxShadow: '0 0 60px -12px rgba(0,180,255,0.15)',
+        background: '#1a1a2e',
+        border: '1px solid #ff6600',
+        fontFamily: '"Lucida Console", "Consolas", "Courier New", monospace',
+        boxShadow: '0 0 40px -8px rgba(255,102,0,0.2), inset 0 0 80px -20px rgba(0,0,0,0.5)',
       }}
     >
-      {/* Terminal title bar */}
+      {/* Bloomberg-style top bar */}
       <div
-        className="flex items-center gap-2 px-4 py-2.5"
+        className="flex items-center justify-between px-3 py-1.5"
         style={{
-          borderBottom: '1px solid rgba(0,180,255,0.1)',
-          background: 'rgba(0,10,30,0.6)',
+          background: '#000000',
+          borderBottom: '2px solid #ff6600',
         }}
       >
-        <div className="flex gap-1.5">
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: '#ff5f57' }}
-          />
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: '#febc2e' }}
-          />
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: '#28c840' }}
-          />
+        <div className="flex items-center gap-3">
+          <span
+            style={{
+              color: '#ff6600',
+              fontSize: '13px',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+            }}
+          >
+            CYBRISK
+          </span>
+          <span style={{ color: '#333', fontSize: '13px' }}>|</span>
+          <span style={{ color: '#ff9933', fontSize: '11px' }}>
+            FAIR RISK ENGINE
+          </span>
         </div>
-        <span
-          className="ml-3 text-[11px] tracking-wider uppercase font-mono"
-          style={{ color: '#4a6080' }}
-        >
-          cybrisk \u2014 fair monte carlo engine v2.1
-        </span>
+        <div className="flex items-center gap-4">
+          <span style={{ color: '#666666', fontSize: '10px' }}>
+            {timestamp}
+          </span>
+          <span
+            style={{
+              color: phase === 'DONE' ? '#00ff00' : phase === 'SIM' ? '#ffcc00' : '#ff6600',
+              fontSize: '10px',
+              fontWeight: 700,
+            }}
+          >
+            {phase === 'INIT' ? 'LOADING' : phase === 'SIM' ? 'RUNNING' : phase === 'POST' ? 'PROCESSING' : 'COMPLETE'}
+          </span>
+        </div>
       </div>
 
-      {/* Terminal body */}
+      {/* Function key bar */}
       <div
-        ref={containerRef}
-        className="p-5 font-mono text-sm leading-relaxed overflow-y-auto"
-        style={{ maxHeight: '480px', minHeight: '320px' }}
+        className="flex items-center gap-1 px-2 py-1"
+        style={{
+          background: '#0a0a1a',
+          borderBottom: '1px solid #333',
+          fontSize: '9px',
+        }}
       >
-        {visibleLines.map((line, i) => {
-          const isCompleteLine = line.startsWith('\u2713');
-          const isSummaryLine =
-            i === visibleLines.length - 1 && isComplete && line.startsWith('  ');
-          const isRecalibrate = line.includes('Recalibrating') || line.includes('heavy-tailed');
-          const isConvergence = line.includes('convergence') || line.includes('\u03B4=');
-
-          return (
-            <div
-              key={i}
-              className="animate-fade-in"
+        {['1)PARAMS', '2)ENGINE', '3)OUTPUT', '4)EXPORT', '5)BENCH', '6)HELP'].map(
+          (label) => (
+            <span
+              key={label}
+              className="px-2 py-0.5"
               style={{
-                animationDuration: '0.2s',
-                color: isCompleteLine
-                  ? '#22c55e'
-                  : isSummaryLine
-                    ? '#00d4ff'
-                    : isRecalibrate
-                      ? '#f97316'
-                      : isConvergence
-                        ? '#eab308'
-                        : '#8899bb',
-                fontWeight: isCompleteLine || isSummaryLine ? 600 : 400,
-                marginBottom: isCompleteLine ? '2px' : '6px',
+                color: '#888',
+                background: '#111',
+                border: '1px solid #333',
               }}
             >
-              {line}
-            </div>
-          );
-        })}
+              {label}
+            </span>
+          ),
+        )}
+      </div>
 
-        {/* Progress bar */}
-        {progressPct !== null && (
+      {/* Main content area: two columns */}
+      <div className="flex" style={{ minHeight: '420px' }}>
+        {/* Left panel: parameters + metrics */}
+        <div
+          className="flex-shrink-0 flex flex-col"
+          style={{
+            width: '240px',
+            borderRight: '1px solid #333',
+            background: '#0d0d20',
+          }}
+        >
+          {/* Parameters panel */}
           <div
-            className="font-mono"
-            style={{ color: '#00d4ff', marginBottom: '6px' }}
+            className="px-3 py-2"
+            style={{ borderBottom: '1px solid #222' }}
           >
-            {'  '}
-            {renderProgressBar(progressPct)}
+            <div
+              style={{
+                color: '#ff6600',
+                fontSize: '10px',
+                fontWeight: 700,
+                marginBottom: '6px',
+                letterSpacing: '1px',
+              }}
+            >
+              ASSESSMENT PARAMS
+            </div>
+            {[
+              ['SECTOR', industry.toUpperCase()],
+              ['REGION', GEO_LABELS[inputs.company.geography] ?? 'N/A'],
+              ['REVENUE', REVENUE_LABELS[inputs.company.revenueBand] ?? 'N/A'],
+              ['RECORDS', fmtNumber(inputs.data.recordCount)],
+              ['EMP MULT', `${empMult}x`],
+              ['CLOUD', `${inputs.data.cloudPercentage}%`],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="flex justify-between"
+                style={{
+                  fontSize: '11px',
+                  marginBottom: '2px',
+                }}
+              >
+                <span style={{ color: '#666' }}>{label}</span>
+                <span style={{ color: '#cccccc' }}>{value}</span>
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* Blinking cursor when not complete */}
-        {!isComplete && (
-          <span
-            className="inline-block w-2 h-4 animate-pulse"
-            style={{ background: '#00d4ff', opacity: 0.7 }}
-          />
-        )}
+          {/* Controls panel */}
+          <div
+            className="px-3 py-2"
+            style={{ borderBottom: '1px solid #222' }}
+          >
+            <div
+              style={{
+                color: '#ff6600',
+                fontSize: '10px',
+                fontWeight: 700,
+                marginBottom: '6px',
+                letterSpacing: '1px',
+              }}
+            >
+              SECURITY CONTROLS
+            </div>
+            {[
+              ['IR PLAN', inputs.controls.irPlan],
+              ['MFA', inputs.controls.mfa],
+              ['SEC TEAM', inputs.controls.securityTeam],
+              ['PENTEST', inputs.controls.pentest],
+              ['AI/AUTOM', inputs.controls.aiAutomation],
+              ['INSURANCE', inputs.controls.cyberInsurance],
+            ].map(([label, active]) => (
+              <div
+                key={label as string}
+                className="flex justify-between"
+                style={{
+                  fontSize: '11px',
+                  marginBottom: '2px',
+                }}
+              >
+                <span style={{ color: '#666' }}>{label as string}</span>
+                <span
+                  style={{
+                    color: active ? '#00ff00' : '#ff3333',
+                    fontWeight: 600,
+                  }}
+                >
+                  {active ? 'ON' : 'OFF'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Live metrics panel (shows when simulation running or complete) */}
+          <div className="px-3 py-2 flex-1">
+            <div
+              style={{
+                color: '#ff6600',
+                fontSize: '10px',
+                fontWeight: 700,
+                marginBottom: '6px',
+                letterSpacing: '1px',
+              }}
+            >
+              {isComplete ? 'RESULTS' : 'SIMULATION'}
+            </div>
+            {progressPct !== null && (
+              <>
+                <div
+                  className="flex justify-between"
+                  style={{ fontSize: '11px', marginBottom: '2px' }}
+                >
+                  <span style={{ color: '#666' }}>ITER</span>
+                  <span style={{ color: '#ffcc00' }}>
+                    {fmtNumber(iterCount)}/100,000
+                  </span>
+                </div>
+                <div
+                  className="flex justify-between"
+                  style={{ fontSize: '11px', marginBottom: '4px' }}
+                >
+                  <span style={{ color: '#666' }}>PROGRESS</span>
+                  <span style={{ color: '#ffcc00' }}>{progressPct}%</span>
+                </div>
+                {/* Progress bar */}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    background: '#111',
+                    border: '1px solid #333',
+                    marginBottom: '4px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progressPct}%`,
+                      height: '100%',
+                      background:
+                        progressPct < 50
+                          ? '#ff6600'
+                          : progressPct < 80
+                            ? '#ffcc00'
+                            : '#00ff00',
+                      transition: 'width 80ms linear',
+                    }}
+                  />
+                </div>
+              </>
+            )}
+            {results && (
+              <>
+                {[
+                  ['ALE', fmtDollar(results.ale.mean), '#ff6600'],
+                  ['PML\u2089\u2085', fmtDollar(results.ale.p95), '#ff3333'],
+                  ['MEDIAN', fmtDollar(results.ale.median), '#cccccc'],
+                  ['G-L z*', fmtDollar(results.gordonLoebSpend), '#00ccff'],
+                  [
+                    'RISK',
+                    results.riskRating,
+                    results.riskRating === 'CRITICAL'
+                      ? '#ff0000'
+                      : results.riskRating === 'HIGH'
+                        ? '#ff6600'
+                        : results.riskRating === 'MODERATE'
+                          ? '#ffcc00'
+                          : '#00ff00',
+                  ],
+                  [
+                    'BENCH',
+                    `P${results.industryBenchmark.percentileRank}`,
+                    '#ff9933',
+                  ],
+                ].map(([label, value, color]) => (
+                  <div
+                    key={label}
+                    className="flex justify-between"
+                    style={{
+                      fontSize: '11px',
+                      marginBottom: '2px',
+                    }}
+                  >
+                    <span style={{ color: '#666' }}>{label}</span>
+                    <span style={{ color, fontWeight: 700 }}>{value}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {!results && progressPct === null && (
+              <div style={{ color: '#333', fontSize: '10px' }}>
+                AWAITING DATA...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right panel: log output */}
+        <div className="flex-1 flex flex-col" style={{ background: '#0a0a1a' }}>
+          {/* Log header */}
+          <div
+            className="px-3 py-1.5 flex items-center justify-between"
+            style={{
+              borderBottom: '1px solid #222',
+              background: '#111',
+            }}
+          >
+            <span
+              style={{
+                color: '#ff6600',
+                fontSize: '10px',
+                fontWeight: 700,
+                letterSpacing: '1px',
+              }}
+            >
+              ENGINE LOG
+            </span>
+            <span style={{ color: '#444', fontSize: '9px' }}>
+              N=100K | FAIR v2.1 | PERT+LN+BETA
+            </span>
+          </div>
+
+          {/* Log body */}
+          <div
+            ref={logRef}
+            className="flex-1 px-3 py-2 overflow-y-auto"
+            style={{ maxHeight: '380px' }}
+          >
+            {logLines.map((line, i) => {
+              const isComplete = line === 'SIMULATION COMPLETE';
+              const isRecalibrate =
+                line.includes('RECALIBRATE') || line.includes('HEAVY-TAIL');
+              const isConvergence =
+                line.includes('CONVERGENCE') || line.includes('\u03B4=');
+              const isIter = line.includes('ITER ');
+              const isFinal = line.includes('FINALISING');
+
+              let color = '#888888';
+              if (isComplete) color = '#00ff00';
+              else if (isRecalibrate) color = '#ff3333';
+              else if (isConvergence) color = '#ffcc00';
+              else if (isIter || isFinal) color = '#ff9933';
+              else if (line.includes('OK') || line.includes('BEGIN')) color = '#00ccff';
+
+              return (
+                <div
+                  key={i}
+                  className="animate-fade-in"
+                  style={{
+                    fontSize: '11px',
+                    lineHeight: '18px',
+                    color,
+                    fontWeight: isComplete ? 700 : 400,
+                    letterSpacing: '0.3px',
+                  }}
+                >
+                  <span style={{ color: '#333', marginRight: '6px' }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  {line}
+                </div>
+              );
+            })}
+
+            {/* Inline progress bar in log area */}
+            {progressPct !== null && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  lineHeight: '18px',
+                  color: '#ff6600',
+                  letterSpacing: '0.3px',
+                }}
+              >
+                <span style={{ color: '#333', marginRight: '6px' }}>
+                  {String(logLines.length + 1).padStart(2, '0')}
+                </span>
+                {'['}
+                <span style={{ color: progressPct < 80 ? '#ff6600' : '#00ff00' }}>
+                  {'\u2588'.repeat(Math.round((progressPct / 100) * 24))}
+                </span>
+                <span style={{ color: '#222' }}>
+                  {'\u2591'.repeat(24 - Math.round((progressPct / 100) * 24))}
+                </span>
+                {'] '}
+                <span style={{ color: '#ffcc00' }}>{progressPct}%</span>
+              </div>
+            )}
+
+            {/* Blinking cursor */}
+            {!isComplete && (
+              <span
+                className="inline-block animate-pulse"
+                style={{
+                  width: '7px',
+                  height: '14px',
+                  background: '#ff6600',
+                  opacity: 0.8,
+                  marginTop: '2px',
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bloomberg-style bottom status bar */}
+      <div
+        className="flex items-center justify-between px-3 py-1"
+        style={{
+          background: '#000000',
+          borderTop: '2px solid #ff6600',
+          fontSize: '9px',
+        }}
+      >
+        <div className="flex items-center gap-4">
+          <span style={{ color: '#ff6600' }}>
+            FAIR METHODOLOGY
+          </span>
+          <span style={{ color: '#444' }}>|</span>
+          <span style={{ color: '#666' }}>
+            {industry.toUpperCase()} / {GEO_LABELS[inputs.company.geography]}
+          </span>
+          <span style={{ color: '#444' }}>|</span>
+          <span style={{ color: '#666' }}>
+            REV {REVENUE_LABELS[inputs.company.revenueBand]}
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          {results && (
+            <>
+              <span style={{ color: '#ff6600', fontWeight: 700 }}>
+                ALE {fmtDollarCompact(results.ale.mean)}
+              </span>
+              <span style={{ color: '#ff3333' }}>
+                PML {fmtDollarCompact(results.ale.p95)}
+              </span>
+            </>
+          )}
+          <span style={{ color: '#444' }}>
+            CYBRISK &copy; 2026
+          </span>
+        </div>
       </div>
     </div>
   );

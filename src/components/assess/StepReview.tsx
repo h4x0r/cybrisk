@@ -130,7 +130,7 @@ export default function StepReview({ data }: StepProps) {
           className="text-sm"
           style={{ fontFamily: 'var(--font-geist-mono)', color: '#4a6080' }}
         >
-          // verify inputs before Monte Carlo simulation (N=10,000)
+          // verify inputs before Monte Carlo simulation (N=100,000)
         </p>
       </div>
 
@@ -271,7 +271,7 @@ export default function StepReview({ data }: StepProps) {
           border: '1px solid rgba(0,180,255,0.06)',
         }}
       >
-        Ready to run 10,000 Monte Carlo simulations using FAIR methodology
+        Ready to run 100,000 Monte Carlo simulations using FAIR methodology
       </div>
     </div>
   );
