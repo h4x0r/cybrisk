@@ -51,10 +51,10 @@ const PAIN_POINTS = [
   },
 ];
 
-const PERCENTILE_LEGEND = [
-  { label: 'P50 — ALE Median', color: '#06b6d4' },
-  { label: 'P95 — Probable Maximum Loss', color: '#ef4444' },
-  { label: 'Optimal Security Spend (Gordon-Loeb)', color: '#22c55e' },
+const SURFACE_LEGEND = [
+  { label: 'ALE — Annualized Loss Expectancy', color: '#06b6d4' },
+  { label: 'PML — Probable Maximum Loss (95th)', color: '#ef4444' },
+  { label: 'GL z* — Gordon-Loeb Optimal Spend', color: '#22c55e' },
 ];
 
 export default function LandingPage() {
@@ -333,13 +333,13 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="h-[380px] w-full">
+            <div className="h-[420px] w-full">
               <HeroChart />
             </div>
 
             {/* Percentile legend */}
             <div className="flex flex-wrap justify-center gap-6 mt-6 pt-4 border-t border-[rgba(0,180,255,0.08)]">
-              {PERCENTILE_LEGEND.map((l) => (
+              {SURFACE_LEGEND.map((l) => (
                 <div key={l.label} className="flex items-center gap-2">
                   <div
                     className="w-5 h-0.5 rounded"
