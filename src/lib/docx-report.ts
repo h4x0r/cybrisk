@@ -585,6 +585,244 @@ function renderBenchmarkChart(
   return canvasToPngBytes(canvas);
 }
 
+/**
+ * Chart 4: 3D Loss-Exceedance Surface
+ * Quant-style wireframe surface: X=Loss, Y=TEF, Z=P(Loss>x|TEF=λ)
+ * Uses compound Poisson / log-normal severity model (same as landing page).
+ */
+function renderSurfaceChart(
+  aleMean: number,
+  p95: number,
+  gordonLoeb: number,
+  tefMin: number,
+  tefMode: number,
+  tefMax: number,
+): Uint8Array {
+  const W = 1200;
+  const H = 700;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  // White background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid parameters
+  const COLS = 50;
+  const ROWS = 30;
+  const MAX_LOSS = Math.max(p95 * 1.8, aleMean * 3);
+  const MIN_TEF = Math.max(0.05, tefMin);
+  const MAX_TEF = Math.max(tefMax, tefMode * 2);
+  const LOG_MU = Math.log(Math.max(aleMean * 0.4, 50000));
+  const LOG_SIG = 1.2;
+
+  // erfc approximation
+  function erfc(x: number): number {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x));
+    const p =
+      t *
+      (0.254829592 +
+        t *
+          (-0.284496736 +
+            t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    const r = p * Math.exp(-x * x);
+    return x >= 0 ? r : 2 - r;
+  }
+
+  function normSF(z: number): number {
+    return 0.5 * erfc(z / 1.41421356237);
+  }
+
+  function surfaceZ(col: number, row: number): number {
+    const loss = Math.max(1, (col / (COLS - 1)) * MAX_LOSS);
+    const tef = MIN_TEF + (row / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
+    const z = (Math.log(loss) - LOG_MU) / LOG_SIG;
+    return tef * normSF(z);
+  }
+
+  // Color palette: deep navy → indigo → cyan → teal → amber → crimson
+  function surfaceColor(z: number): string {
+    const r = Math.min(1, z / 2.2);
+    if (r < 0.18) {
+      const p = r / 0.18;
+      return `hsl(${235 - p * 10},${50 + p * 30}%,${12 + p * 12}%)`;
+    }
+    if (r < 0.35) {
+      const p = (r - 0.18) / 0.17;
+      return `hsl(${225 - p * 35},${80 + p * 10}%,${24 + p * 14}%)`;
+    }
+    if (r < 0.55) {
+      const p = (r - 0.35) / 0.2;
+      return `hsl(${190 - p * 110},88%,${38 + p * 16}%)`;
+    }
+    if (r < 0.75) {
+      const p = (r - 0.55) / 0.2;
+      return `hsl(${80 - p * 40},85%,${54 + p * 10}%)`;
+    }
+    const p = (r - 0.75) / 0.25;
+    return `hsl(${40 - p * 35},90%,${64 + p * 6}%)`;
+  }
+
+  // Isometric projection
+  const cw = 8.5;
+  const dxC = cw * 1.0;
+  const dyC = -cw * 0.26;
+  const dxR = -cw * 0.38;
+  const dyR = cw * 0.72;
+  const zSc = cw * 3.2;
+  const ox = W * 0.3;
+  const oy = H * 0.52;
+
+  const px = (c: number, r: number) => ox + c * dxC + r * dxR;
+  const py = (c: number, r: number, z: number) =>
+    oy + c * dyC + r * dyR - z * zSc;
+
+  // Title
+  ctx.font = 'bold 22px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#0A1628';
+  ctx.textAlign = 'center';
+  ctx.fillText('Loss Exceedance Surface \u2014 P(Annual Loss > x | TEF=\u03BB)', W / 2, 30);
+
+  // Subtitle
+  ctx.font = '14px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#8899BB';
+  ctx.fillText(
+    `Compound Poisson / Log-Normal severity | \u03BC=ln(${fmtAxisDollar(Math.exp(LOG_MU))}), \u03C3=${LOG_SIG}`,
+    W / 2,
+    50,
+  );
+
+  // Base plate edges (z=0 floor)
+  ctx.strokeStyle = 'rgba(0,120,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px(0, ROWS - 1), py(0, ROWS - 1, 0));
+  ctx.lineTo(px(COLS - 1, ROWS - 1), py(COLS - 1, ROWS - 1, 0));
+  ctx.lineTo(px(COLS - 1, 0), py(COLS - 1, 0, 0));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(px(0, 0), py(0, 0, 0));
+  ctx.lineTo(px(COLS - 1, 0), py(COLS - 1, 0, 0));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(px(0, 0), py(0, 0, 0));
+  ctx.lineTo(px(0, ROWS - 1), py(0, ROWS - 1, 0));
+  ctx.stroke();
+
+  // Surface quads (painter's algorithm: back to front)
+  for (let row = 0; row < ROWS - 1; row++) {
+    for (let col = 0; col < COLS - 1; col++) {
+      const z00 = surfaceZ(col, row);
+      const z10 = surfaceZ(col + 1, row);
+      const z11 = surfaceZ(col + 1, row + 1);
+      const z01 = surfaceZ(col, row + 1);
+      const zm = (z00 + z10 + z11 + z01) * 0.25;
+
+      ctx.beginPath();
+      ctx.moveTo(px(col, row), py(col, row, z00));
+      ctx.lineTo(px(col + 1, row), py(col + 1, row, z10));
+      ctx.lineTo(px(col + 1, row + 1), py(col + 1, row + 1, z11));
+      ctx.lineTo(px(col, row + 1), py(col, row + 1, z01));
+      ctx.closePath();
+      ctx.fillStyle = surfaceColor(zm);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 0.4;
+      ctx.stroke();
+    }
+  }
+
+  // Reference lines traced on the surface
+  const refLines = [
+    { loss: gordonLoeb, color: '#22c55e', label: 'GL z*' },
+    { loss: aleMean, color: '#06b6d4', label: 'ALE' },
+    { loss: p95, color: '#ef4444', label: 'PML\u2089\u2085' },
+  ];
+
+  for (const ref of refLines) {
+    const refCol = Math.min(COLS - 1, Math.max(0, (ref.loss / MAX_LOSS) * (COLS - 1)));
+    ctx.beginPath();
+    ctx.strokeStyle = ref.color;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 3]);
+    for (let row = 0; row < ROWS; row++) {
+      const z = surfaceZ(refCol, row);
+      const x = px(refCol, row);
+      const y = py(refCol, row, z);
+      if (row === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label at front edge
+    const z0 = surfaceZ(refCol, 0);
+    const lx = px(refCol, 0);
+    const ly = py(refCol, 0, z0);
+    ctx.font = 'bold 13px Calibri, Arial, sans-serif';
+    ctx.fillStyle = ref.color;
+    ctx.textAlign = 'left';
+    ctx.fillText(`${ref.label} ${fmtAxisDollar(ref.loss)}`, lx - 4, ly - 12);
+  }
+
+  // Axis labels
+  ctx.font = '12px Calibri, Arial, sans-serif';
+  ctx.fillStyle = 'rgba(0,120,255,0.5)';
+  ctx.textAlign = 'left';
+  ctx.fillText(
+    'Loss Amount ($) \u2192',
+    px(COLS * 0.4, ROWS - 1),
+    py(COLS * 0.4, ROWS - 1, 0) + 18,
+  );
+  ctx.fillText(
+    '\u2190 TEF (\u03BB)',
+    px(0, ROWS - 1) - 55,
+    py(0, ROWS - 1, 0) + 14,
+  );
+
+  // Z axis label
+  ctx.save();
+  ctx.translate(ox - (ROWS - 1) * cw * 0.38 - 20, oy - zSc * 1.5);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = 'rgba(0,120,255,0.45)';
+  ctx.fillText('P(Loss > x)', -28, 0);
+  ctx.restore();
+
+  // X-axis tick labels (front edge)
+  ctx.fillStyle = 'rgba(0,100,200,0.4)';
+  ctx.font = '10px Calibri, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  const xTickCount = 5;
+  for (let i = 0; i <= xTickCount; i++) {
+    const loss = (MAX_LOSS * i) / xTickCount;
+    const col = (loss / MAX_LOSS) * (COLS - 1);
+    const x = px(col, ROWS - 1);
+    const y = py(col, ROWS - 1, 0);
+    ctx.fillText(fmtAxisDollar(loss), x, y + 14);
+  }
+
+  // Y-axis tick labels (right edge)
+  ctx.textAlign = 'left';
+  const yTickCount = 4;
+  for (let i = 0; i <= yTickCount; i++) {
+    const tef = MIN_TEF + ((MAX_TEF - MIN_TEF) * i) / yTickCount;
+    const row = ((tef - MIN_TEF) / (MAX_TEF - MIN_TEF)) * (ROWS - 1);
+    const x = px(COLS - 1, row);
+    const y = py(COLS - 1, row, 0);
+    ctx.fillText(`\u03BB=${tef.toFixed(1)}`, x + 8, y + 4);
+  }
+
+  // Footnote
+  ctx.font = '11px Calibri, Arial, sans-serif';
+  ctx.fillStyle = '#AABBCC';
+  ctx.textAlign = 'center';
+  ctx.fillText('CybRisk | FAIR Methodology | Compound Poisson Process', W / 2, H - 8);
+
+  return canvasToPngBytes(canvas);
+}
+
 // ---------------------------------------------------------------------------
 // Helper: create styled table cells
 // ---------------------------------------------------------------------------
@@ -644,6 +882,7 @@ function dataCell(
 interface ChartImages {
   distribution: Uint8Array;
   exceedance: Uint8Array;
+  surface: Uint8Array;
   benchmark: Uint8Array;
 }
 
@@ -939,9 +1178,38 @@ function buildDocument(
       ],
       spacing: { before: 60, after: 200 },
     }),
+    new Paragraph({ children: [new PageBreak()] }),
     new Paragraph({
-      children: [new PageBreak()],
+      text: 'Loss Exceedance Surface',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { after: 100 },
     }),
+    new Paragraph({
+      children: [
+        new ImageRun({
+          type: 'png',
+          data: charts.surface,
+          transformation: {
+            width: CHART_WIDTH_EMU,
+            height: Math.round(3.5 * EMU_PER_INCH),
+          },
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Figure 3: Three-dimensional loss exceedance surface showing how breach probability P(Loss > x) varies across loss thresholds (X-axis) and threat event frequencies \u03BB (Y-axis). Reference lines trace the Gordon-Loeb optimal spend (green), ALE mean (cyan), and 95th percentile PML (red) across the TEF dimension. Surface computed using compound Poisson process with log-normal severity.',
+          size: 18,
+          color: MID_GRAY,
+          font: 'Calibri',
+          italics: true,
+        }),
+      ],
+      spacing: { before: 60, after: 200 },
+    }),
+    new Paragraph({ children: [new PageBreak()] }),
   );
 
   // --- Assessment Parameters ---
@@ -1305,7 +1573,7 @@ function buildDocument(
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Figure 3: Comparison of estimated annualised loss expectancy against the industry median, derived from IBM Cost of a Data Breach Report 2025.',
+          text: 'Figure 4: Comparison of estimated annualised loss expectancy against the industry median, derived from IBM Cost of a Data Breach Report 2025.',
           size: 18,
           color: MID_GRAY,
           font: 'Calibri',
@@ -1828,6 +2096,7 @@ export async function downloadReport(
   results: SimulationResults,
 ): Promise<void> {
   // Pre-render charts on Canvas → PNG
+  const tef = TEF_BY_INDUSTRY[inputs.company.industry];
   const charts: ChartImages = {
     distribution: renderDistributionChart(
       results.distributionBuckets,
@@ -1839,6 +2108,14 @@ export async function downloadReport(
       results.ale.mean,
       results.ale.p95,
       results.gordonLoebSpend,
+    ),
+    surface: renderSurfaceChart(
+      results.ale.mean,
+      results.ale.p95,
+      results.gordonLoebSpend,
+      tef.min,
+      tef.mode,
+      tef.max,
     ),
     benchmark: renderBenchmarkChart(
       results.industryBenchmark.yourAle,
