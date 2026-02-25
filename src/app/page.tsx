@@ -253,14 +253,14 @@ export default function LandingPage() {
             className="animate-fade-up max-w-5xl mx-auto"
             style={{ animationDelay: '900ms' }}
           >
-          <div
-            className="rounded-2xl p-6 md:p-8 relative animate-border-glow"
-            style={{
-              background: 'rgba(4, 8, 28, 0.92)',
-              border: '1px solid rgba(0,180,255,0.18)',
-              backdropFilter: 'blur(18px)',
-            }}
-          >
+            <div
+              className="rounded-2xl p-6 md:p-8 relative animate-border-glow"
+              style={{
+                background: 'rgba(4, 8, 28, 0.92)',
+                border: '1px solid rgba(0,180,255,0.18)',
+                backdropFilter: 'blur(18px)',
+              }}
+            >
             {/* Top gradient wash */}
             <div
               className="absolute inset-0 rounded-2xl pointer-events-none"
@@ -360,7 +360,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
+            </div>
           </div>
         </section>
 

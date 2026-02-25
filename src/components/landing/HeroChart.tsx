@@ -52,6 +52,7 @@ export default function HeroChart() {
           labelFormatter={(val) => `Simulated Loss: ${formatDollar(val as number)}`}
           formatter={(val: number) => [`${val.toFixed(2)}%`, 'Likelihood']}
         />
+        <ReferenceLine x={460650} stroke="#22c55e" strokeDasharray="4 4" label={{ position: 'top', value: 'Gordon-Loeb', fill: '#22c55e', fontSize: 11, fontWeight: 'bold' }} />
         <ReferenceLine x={1245000} stroke="#06b6d4" strokeDasharray="4 4" label={{ position: 'top', value: 'ALE Median', fill: '#06b6d4', fontSize: 12, fontWeight: 'bold' }} />
         <ReferenceLine x={3500000} stroke="#ef4444" strokeDasharray="4 4" label={{ position: 'top', value: 'PML (95th %ile)', fill: '#ef4444', fontSize: 12, fontWeight: 'bold' }} />
         <Area 
