@@ -202,7 +202,7 @@ function buildDocument(
   results: SimulationResults,
 ): Document {
   const orgName =
-    inputs.company.organizationName?.trim() || 'Organisation';
+    inputs.company.organizationName?.trim() || 'Acme Corp';
   const industry = INDUSTRY_NAMES[inputs.company.industry];
   const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -1283,7 +1283,7 @@ export async function downloadReport(
   const doc = buildDocument(inputs, results);
   const blob = await Packer.toBlob(doc);
 
-  const orgSlug = (inputs.company.organizationName ?? 'org')
+  const orgSlug = (inputs.company.organizationName ?? 'acme-corp')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
