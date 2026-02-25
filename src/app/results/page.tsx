@@ -138,6 +138,62 @@ export default function ResultsPage() {
           />
         </div>
 
+        {/* Assumptions & Limitations */}
+        <details
+          className="mt-6 group"
+          style={{
+            ...glassmorphism,
+            padding: '0',
+          }}
+        >
+          <summary
+            className="px-6 py-4 cursor-pointer list-none flex items-center justify-between"
+            style={{
+              borderBottom: '1px solid rgba(0,180,255,0.08)',
+            }}
+          >
+            <span
+              className="text-xs font-semibold tracking-widest uppercase"
+              style={{ fontFamily: 'var(--font-geist-mono)', color: '#4a6080' }}
+            >
+              Model Assumptions &amp; Limitations
+            </span>
+            <span
+              className="text-xs transition-transform group-open:rotate-180"
+              style={{ color: '#4a6080' }}
+            >
+              ▼
+            </span>
+          </summary>
+          <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
+            {[
+              ['Revenue cap', 'Primary loss is capped at 10% of the revenue band midpoint to prevent outlier inflation.'],
+              ['percentileRank', 'Industry benchmark rank uses a linear heuristic: rank = min(100, ALE / industry_median × 50). Not a statistically derived percentile.'],
+              ['TEF baseline', 'Threat Event Frequency sampled from PERT distributions fitted to Verizon DBIR 2025 industry breach rates.'],
+              ['Per-record cost', 'Per-record breach costs from IBM Cost of a Data Breach 2024 (USD). US-centric; international figures are approximated.'],
+              ['Notification cost', '$2–$5 per record (PERT), representative of US/EU breach notification spend.'],
+              ['Secondary loss', 'Litigation (15–30% of primary), reputation (20–40%), regulatory fines (PERT 1–50% of max fine), and notification stacked independently.'],
+              ['Cyber insurance', 'Insurance modelled as a 50% reduction to secondary losses only. Actual policy terms will differ.'],
+              ['Iterations', 'N=100,000 trials. Results are statistically stable but not identical across runs (non-seeded RNG).'],
+            ].map(([label, note]) => (
+              <div key={label} className="flex gap-3">
+                <span
+                  className="shrink-0 text-[10px] font-bold tracking-wider mt-0.5"
+                  style={{ fontFamily: 'var(--font-geist-mono)', color: '#2a6080', minWidth: 120 }}
+                >
+                  {label}
+                </span>
+                <span
+                  className="text-xs leading-relaxed"
+                  style={{ color: '#4a5a70' }}
+                >
+                  {note}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+
         {/* Actions */}
         <div className="flex justify-center gap-4 mt-8 mb-12">
           {inputs && (

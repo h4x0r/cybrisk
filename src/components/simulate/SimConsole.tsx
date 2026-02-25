@@ -129,8 +129,10 @@ export default function SimConsole({
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [phase, setPhase] = useState<'INIT' | 'SIM' | 'POST' | 'DONE'>('INIT');
   const [iterCount, setIterCount] = useState(0);
+  const [runTimeMs, setRunTimeMs] = useState<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
+  const simStartRef = useRef<number | null>(null);
 
   // Auto-scroll log
   useEffect(() => {
@@ -212,6 +214,7 @@ export default function SimConsole({
     addLine('MONTE CARLO N=100,000 BEGIN');
     await delay(250, 80);
 
+    simStartRef.current = performance.now();
     const simPromise = new Promise<SimulationResults>((resolve) => {
       setTimeout(() => resolve(simulate(inputs)), 50);
     });
@@ -262,6 +265,10 @@ export default function SimConsole({
     }
 
     const simResults = await simPromise;
+    const elapsed = simStartRef.current !== null
+      ? Math.round(performance.now() - simStartRef.current)
+      : null;
+    if (elapsed !== null) setRunTimeMs(elapsed);
 
     setProgressPct(100);
     setIterCount(100000);
@@ -291,7 +298,9 @@ export default function SimConsole({
     // COMPLETE
     // =====================================================================
     setPhase('DONE');
-    addLine('SIMULATION COMPLETE');
+    addLine(elapsed !== null
+      ? `SIMULATION COMPLETE — ${elapsed}ms (N=100,000 trials)`
+      : 'SIMULATION COMPLETE');
     setResults(simResults);
     setIsComplete(true);
 
@@ -722,6 +731,11 @@ export default function SimConsole({
                 PML {fmtDollarCompact(results.ale.p95)}
               </span>
             </>
+          )}
+          {runTimeMs !== null && (
+            <span style={{ color: '#555' }}>
+              {runTimeMs}ms
+            </span>
           )}
           <span style={{ color: '#444' }}>
             CYBRISK &copy; 2026

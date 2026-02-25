@@ -146,6 +146,24 @@ export default function LandingPage() {
             — using actuarial science, not opinions.
           </p>
 
+          {/* Flow microline */}
+          <div
+            className="animate-fade-up flex items-center justify-center gap-2 mb-8 text-[11px]"
+            style={{
+              animationDelay: '300ms',
+              fontFamily: 'var(--font-geist-mono)',
+              color: '#4a6080',
+            }}
+          >
+            {['5-step assessment', 'Monte Carlo N=100K', 'board-ready DOCX'].map((step, i) => (
+              <span key={step} className="flex items-center gap-2">
+                <span style={{ color: '#2a4060' }}>{String(i + 1).padStart(2, '0')}</span>
+                <span style={{ color: '#6888aa' }}>{step}</span>
+                {i < 2 && <span style={{ color: '#1a3050' }}>→</span>}
+              </span>
+            ))}
+          </div>
+
           {/* CTA */}
           <div
             className="animate-fade-up mb-6"
