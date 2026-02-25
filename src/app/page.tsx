@@ -8,20 +8,13 @@ const ScientistBg = dynamic(() => import('@/components/landing/ScientistBg'), {
   ssr: false,
 });
 
-const FORMULAS = [
-  'Risk = LEF × E[LM]',
-  'ALE = (1/N)Σ LMᵢ',
-  'VaR₀.₉₅ = PML',
-  'z* ≤ S/e',
-];
-
 const TRUST_STATS = [
-  { val: '100,000', label: 'MC Simulations', color: '#00d4ff' },
-  { val: 'IBM 2024', label: '$4.88M μ_breach', color: '#a0d0ff' },
+  { val: '100,000', label: 'Monte Carlo Trials', color: '#00d4ff' },
+  { val: 'IBM 2024', label: 'Avg Breach Cost', color: '#a0d0ff' },
   { val: 'Verizon DBIR', label: 'Threat Frequencies', color: '#a0d0ff' },
   { val: 'NetDiligence', label: 'Cyber Claims Data', color: '#a0d0ff' },
   { val: 'Gordon-Loeb', label: 'Optimal Spend Model', color: '#ffd060' },
-  { val: 'FAIR™', label: 'Risk Framework', color: '#80ffb0' },
+  { val: 'FAIR\u2122', label: 'Risk Framework', color: '#80ffb0' },
 ];
 
 const PAIN_POINTS = [
@@ -29,24 +22,21 @@ const PAIN_POINTS = [
     stat: '$4.88M',
     statLabel: 'avg breach cost',
     claim: 'Know your exact dollar exposure',
-    body: "IBM says the average breach costs $4.88M. But that's an average — your number depends on your industry, data volume, and controls. We calculate yours.",
-    formula: 'ΔRisk/Δz = marginal ROSI',
+    body: "IBM says the average breach costs $4.88M. But that's an average \u2014 your number depends on your industry, data volume, and controls. We calculate yours.",
     color: '#ef4444',
   },
   {
     stat: '100,000',
     statLabel: 'simulations',
     claim: 'Actuarial proof, not opinions',
-    body: 'Every estimate is backed by 100,000 Monte Carlo trials using IBM, Verizon DBIR, and NetDiligence cyber claims data. Poisson frequencies. Log-normal severities. Real math.',
-    formula: 'σ²_ALE = Σ σ²_LM · λ',
+    body: 'Every estimate is backed by 100,000 Monte Carlo trials using IBM, Verizon DBIR, and NetDiligence cyber claims data. Real actuarial math, not guesswork.',
     color: '#00d4ff',
   },
   {
     stat: '37%',
     statLabel: 'optimal spend cap',
     claim: 'Mathematically optimal security budget',
-    body: 'The Gordon-Loeb model proves when spending more on security stops making financial sense. We show your point of diminishing returns — with a derivable formula.',
-    formula: 'z* ≤ (1/e) · v · S',
+    body: 'The Gordon-Loeb model proves when spending more on security stops making financial sense. We show your exact point of diminishing returns.',
     color: '#22c55e',
   },
 ];
@@ -156,42 +146,14 @@ export default function LandingPage() {
             — using actuarial science, not opinions.
           </p>
 
-          {/* Formula strip */}
-          <div
-            className="animate-fade-in flex flex-wrap items-center justify-center gap-x-1 mb-10"
-            style={{ animationDelay: '400ms' }}
-          >
-            {FORMULAS.map((f, i) => (
-              <span key={f} className="flex items-center">
-                <span
-                  className="text-xs md:text-sm px-3 py-1"
-                  style={{
-                    fontFamily: 'var(--font-geist-mono)',
-                    color: 'rgba(0,200,255,0.55)',
-                  }}
-                >
-                  {f}
-                </span>
-                {i < FORMULAS.length - 1 && (
-                  <span
-                    className="text-[10px]"
-                    style={{ color: 'rgba(0,180,255,0.2)' }}
-                  >
-                    ·
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-
           {/* CTA */}
           <div
-            className="animate-fade-up flex flex-col sm:flex-row items-center justify-center gap-6 mb-6"
-            style={{ animationDelay: '500ms' }}
+            className="animate-fade-up mb-6"
+            style={{ animationDelay: '400ms' }}
           >
             <Link
               href="/assess"
-              className="group flex items-center gap-2 px-8 py-4 rounded-full text-lg font-semibold transition-all hover:scale-[1.03] active:scale-[0.98] animate-glow-pulse"
+              className="group inline-flex items-center gap-2 px-8 py-4 rounded-full text-lg font-semibold transition-all hover:scale-[1.03] active:scale-[0.98] animate-glow-pulse"
               style={{
                 background: 'linear-gradient(135deg, #0060d0 0%, #00b0f0 100%)',
                 color: '#fff',
@@ -200,18 +162,15 @@ export default function LandingPage() {
               Calculate Financial Exposure
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-
-            <div
-              className="text-left text-[11px] border-l pl-4 py-1 space-y-0.5"
+            <p
+              className="mt-4 text-xs"
               style={{
                 fontFamily: 'var(--font-geist-mono)',
-                borderColor: 'rgba(0,180,255,0.15)',
+                color: '#4a6080',
               }}
             >
-              <div style={{ color: '#6888aa' }}>LEF ~ Poisson(λ)</div>
-              <div style={{ color: '#4a6080' }}>LM ~ LogNormal(μ, σ)</div>
-              <div style={{ color: '#4a6080' }}>V ~ Beta-PERT(min, mode, max)</div>
-            </div>
+              Free &middot; No login &middot; Results in 30 seconds
+            </p>
           </div>
         </section>
 
@@ -298,7 +257,7 @@ export default function LandingPage() {
                     color: '#4a6080',
                   }}
                 >
-                  95% CI: $820K – $2.1M · SE = σ_ALE / √10,000
+                  95% CI: $820K – $2.1M · Based on 100K trials
                 </div>
               </div>
               <div className="text-left md:text-right">
@@ -383,7 +342,7 @@ export default function LandingPage() {
                   color: 'rgba(239,68,68,0.7)',
                 }}
               >
-                H₀: heatmaps convey financial risk → REJECTED (p &lt; 0.001)
+                Red-amber-green tells the board nothing. Dollars do.
               </p>
               <h2
                 className="text-3xl md:text-4xl mb-4"
@@ -440,22 +399,11 @@ export default function LandingPage() {
                     {card.claim}
                   </h3>
                   <p
-                    className="text-sm leading-relaxed mb-4"
+                    className="text-sm leading-relaxed"
                     style={{ color: '#6888aa' }}
                   >
                     {card.body}
                   </p>
-                  <div
-                    className="text-xs px-3 py-1.5 rounded inline-block"
-                    style={{
-                      fontFamily: 'var(--font-geist-mono)',
-                      background: 'rgba(0,80,200,0.1)',
-                      border: '1px solid rgba(0,160,255,0.12)',
-                      color: 'rgba(0,200,255,0.5)',
-                    }}
-                  >
-                    {card.formula}
-                  </div>
                 </div>
               ))}
             </div>
@@ -472,7 +420,7 @@ export default function LandingPage() {
             }}
           >
             <div>
-              CybRisk · Security Ronin · Albert Hui CISSP CISM CISA GCFA
+              CybRisk · Security Ronin · Albert Hui · (ISC)&sup2; Information Security Leadership Achievements Honouree
             </div>
             <div>DataExpert Vibe Coding Challenge · Feb 2026</div>
             <div className="mt-2" style={{ color: '#2a3548' }}>
