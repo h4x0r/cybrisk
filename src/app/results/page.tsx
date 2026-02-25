@@ -1,7 +1,7 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { SimulationResults } from '@/lib/types';
+import type { AssessmentInputs, SimulationResults } from '@/lib/types';
 import LorenzCanvas from '@/components/results/LorenzCanvas';
 import TickerBar from '@/components/results/TickerBar';
 import LossDistribution from '@/components/results/LossDistribution';
@@ -21,6 +21,8 @@ const glassmorphism: React.CSSProperties = {
 export default function ResultsPage() {
   const router = useRouter();
   const [results, setResults] = useState<SimulationResults | null>(null);
+  const [inputs, setInputs] = useState<AssessmentInputs | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     try {
@@ -31,10 +33,26 @@ export default function ResultsPage() {
       }
       const parsed: SimulationResults = JSON.parse(raw);
       setResults(parsed);
+
+      const rawInputs = sessionStorage.getItem('assessment');
+      if (rawInputs) {
+        setInputs(JSON.parse(rawInputs) as AssessmentInputs);
+      }
     } catch {
       router.replace('/assess');
     }
   }, [router]);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!results || !inputs) return;
+    setExporting(true);
+    try {
+      const { downloadReport } = await import('@/lib/pdf-report');
+      downloadReport(inputs, results);
+    } finally {
+      setExporting(false);
+    }
+  }, [results, inputs]);
 
   if (!results) {
     return (
@@ -106,6 +124,21 @@ export default function ResultsPage() {
 
         {/* Actions */}
         <div className="flex justify-center gap-4 mt-8 mb-12">
+          {inputs && (
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
+              style={{
+                fontFamily: 'var(--font-geist-mono)',
+                background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.4)',
+                color: '#ef4444',
+              }}
+            >
+              {exporting ? 'Generating...' : 'Export PDF Report'}
+            </button>
+          )}
           <a
             href="/assess"
             className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
