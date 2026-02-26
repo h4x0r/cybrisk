@@ -8,7 +8,8 @@
 | `/assess` | `app/assess/page.tsx` | Page (Client) | 5-step risk assessment wizard |
 | `/simulate` | `app/simulate/page.tsx` | Page (Client) | Bloomberg-style Monte Carlo simulation console |
 | `/results` | `app/results/page.tsx` | Page (Client) | Results dashboard with charts, benchmarks, DOCX export |
-| `/api/calculate` | `app/api/calculate/route.ts` | API Route (POST) | Monte Carlo simulation endpoint (Zod-validated) |
+| `/compare` | `app/compare/page.tsx` | Page (Client) | Scenario comparison — toggle controls, see before/after delta |
+| `/api/calculate` | `app/api/calculate/route.ts` | API Route (POST) | Monte Carlo simulation endpoint (Zod-validated, seeded) |
 
 ## User Flow
 
@@ -17,6 +18,8 @@
   └─► /assess (5-step wizard)
         └─► /simulate (live simulation console)
               └─► /results (dashboard + export)
+                    ├─► /compare (scenario comparison — "what if?")
+                    └─► /results?s=<encoded>&seed=<n> (shareable URL)
 ```
 
 ## API Routes

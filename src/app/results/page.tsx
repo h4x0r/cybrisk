@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { AssessmentInputs, SimulationResults } from '@/lib/types';
 import LorenzCanvas from '@/components/results/LorenzCanvas';
 import TickerBar from '@/components/results/TickerBar';
@@ -11,6 +11,7 @@ import Recommendations from '@/components/results/Recommendations';
 import IndustryBenchmark from '@/components/results/IndustryBenchmark';
 import ResultsSurface from '@/components/results/ResultsSurface';
 import { TEF_BY_INDUSTRY } from '@/lib/lookup-tables';
+import { encodeInputs, deriveShareSeed } from '@/lib/share-url';
 
 const glassmorphism: React.CSSProperties = {
   background: 'rgba(4, 8, 28, 0.92)',
@@ -20,13 +21,42 @@ const glassmorphism: React.CSSProperties = {
   padding: 24,
 };
 
-export default function ResultsPage() {
+function ResultsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [inputs, setInputs] = useState<AssessmentInputs | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Check for shareable URL params first
+    const encoded = searchParams.get('s');
+    const seedParam = searchParams.get('seed');
+
+    if (encoded) {
+      // Dynamically import to avoid circular deps in server components
+      import('@/lib/share-url').then(({ decodeInputs, deriveShareSeed }) => {
+        const decoded = decodeInputs(encoded);
+        if (!decoded) { router.replace('/assess'); return; }
+
+        import('@/lib/monte-carlo').then(({ simulate }) => {
+          const seed = seedParam ? parseInt(seedParam, 10) : deriveShareSeed(decoded);
+          let s = seed >>> 0;
+          const rng = () => {
+            s = (s * 1664525 + 1013904223) & 0xffffffff;
+            return (s >>> 0) / 0xffffffff;
+          };
+          const simResults = simulate(decoded, 100_000, rng);
+          setInputs(decoded);
+          setResults(simResults);
+          sessionStorage.setItem('assessment', JSON.stringify(decoded));
+          sessionStorage.setItem('results', JSON.stringify(simResults));
+        });
+      });
+      return;
+    }
+
     try {
       const raw = sessionStorage.getItem('results');
       if (!raw) {
@@ -43,7 +73,18 @@ export default function ResultsPage() {
     } catch {
       router.replace('/assess');
     }
-  }, [router]);
+  }, [router, searchParams]);
+
+  const handleShare = useCallback(() => {
+    if (!inputs) return;
+    const encoded = encodeInputs(inputs);
+    const seed = deriveShareSeed(inputs);
+    const url = `${window.location.origin}/results?s=${encoded}&seed=${seed}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }, [inputs]);
 
   const handleExportReport = useCallback(async () => {
     if (!results || !inputs) return;
@@ -195,7 +236,7 @@ export default function ResultsPage() {
         </details>
 
         {/* Actions */}
-        <div className="flex justify-center gap-4 mt-8 mb-12">
+        <div className="flex flex-wrap justify-center gap-4 mt-8 mb-12">
           {inputs && (
             <button
               onClick={handleExportReport}
@@ -211,20 +252,36 @@ export default function ResultsPage() {
               {exporting ? 'Generating...' : 'Export Report (.docx)'}
             </button>
           )}
+          {inputs && (
+            <a
+              href="/compare"
+              className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
+              style={{
+                fontFamily: 'var(--font-geist-mono)',
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.3)',
+                color: '#22c55e',
+              }}
+            >
+              What If? →
+            </a>
+          )}
+          {inputs && (
+            <button
+              onClick={handleShare}
+              className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
+              style={{
+                fontFamily: 'var(--font-geist-mono)',
+                background: copied ? 'rgba(34,197,94,0.08)' : 'rgba(0,180,255,0.08)',
+                border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(0,180,255,0.25)'}`,
+                color: copied ? '#22c55e' : '#00d4ff',
+              }}
+            >
+              {copied ? '✓ Copied' : 'Share Results'}
+            </button>
+          )}
           <a
             href="/assess"
-            className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
-            style={{
-              fontFamily: 'var(--font-geist-mono)',
-              background: 'rgba(0,180,255,0.08)',
-              border: '1px solid rgba(0,180,255,0.3)',
-              color: '#00d4ff',
-            }}
-          >
-            &larr; New Assessment
-          </a>
-          <a
-            href="/"
             className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
             style={{
               fontFamily: 'var(--font-geist-mono)',
@@ -233,10 +290,25 @@ export default function ResultsPage() {
               color: '#8899bb',
             }}
           >
-            Home
+            &larr; New Assessment
           </a>
         </div>
       </div>
     </main>
+  );
+}
+
+// Next.js requires useSearchParams to be inside a Suspense boundary
+export default function ResultsPageWrapper() {
+  return (
+    <React.Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center" style={{ background: '#060a18' }}>
+        <div className="text-sm animate-pulse" style={{ fontFamily: 'var(--font-geist-mono)', color: '#4a6080' }}>
+          Loading results...
+        </div>
+      </main>
+    }>
+      <ResultsPage />
+    </React.Suspense>
   );
 }

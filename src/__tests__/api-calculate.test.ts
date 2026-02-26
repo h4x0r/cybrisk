@@ -65,12 +65,13 @@ describe('POST /api/calculate', () => {
     expect(data.rawLosses).toBeUndefined();
   });
 
-  it('returns 400 for missing required fields', async () => {
+  it('returns 400 for missing required fields with fieldErrors', async () => {
     const req = makeRequest({ company: { industry: 'financial' } });
     const res = await POST(req as any);
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toBe('Missing required fields');
+    expect(data.error).toBe('Validation failed');
+    expect(data.fieldErrors).toBeDefined();
   });
 
   it('returns 400 when company is missing', async () => {
@@ -113,15 +114,32 @@ describe('POST /api/calculate', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 500 for invalid JSON body', async () => {
+  it('returns 400 for invalid JSON body', async () => {
     const req = new Request('http://localhost:3000/api/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not-json-{{{',
     });
     const res = await POST(req as any);
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toBe('Simulation failed');
+    expect(data.error).toBe('Invalid JSON body');
+  });
+
+  it('returns identical results for the same seed on repeated calls', async () => {
+    const body = { ...VALID_INPUTS, seed: 12345 };
+    const res1 = await POST(makeRequest(body) as any);
+    const res2 = await POST(makeRequest(body) as any);
+    const d1 = await res1.json();
+    const d2 = await res2.json();
+    expect(d1.ale.mean).toBe(d2.ale.mean);
+    expect(d1.ale.p95).toBe(d2.ale.p95);
+    expect(d1.gordonLoebSpend).toBe(d2.gordonLoebSpend);
+  });
+
+  it('returns 200 with seed omitted (non-deterministic)', async () => {
+    const req = makeRequest(VALID_INPUTS);
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
   });
 });

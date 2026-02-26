@@ -31,6 +31,21 @@ const ThreatTypeSchema = z.enum([
   'web_app_attack', 'system_intrusion', 'lost_stolen',
 ]);
 
+// ---------------------------------------------------------------------------
+// Seeded LCG for deterministic simulation when seed is provided
+// ---------------------------------------------------------------------------
+function seededRng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+const RequestBodySchema = z.object({
+  seed: z.number().int().positive().optional(),
+});
+
 const AssessmentInputsSchema = z.object({
   company: z.object({
     organizationName: z.string().optional(),
@@ -105,6 +120,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  // Extract optional seed before validating the rest
+  const seedParsed = RequestBodySchema.safeParse(body);
+  const seed = seedParsed.success ? seedParsed.data.seed : undefined;
+
   const parsed = AssessmentInputsSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -117,7 +136,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const results = simulate(parsed.data);
+    const rng = seed !== undefined ? seededRng(seed) : Math.random;
+    const results = simulate(parsed.data, 100_000, rng);
     const { rawLosses, ...clientResults } = results;
     return NextResponse.json(clientResults);
   } catch {
