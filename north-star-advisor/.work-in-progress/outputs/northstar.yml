@@ -1,0 +1,89 @@
+# North Star Specification - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/NORTHSTAR.md
+
+metric:
+  name: "Assessment Completion Rate"
+  definition: "Percentage of users who start the 5-step wizard and receive a complete results dashboard"
+  formula: "(Users who reach /results with rendered dashboard) / (Users who load /assess Step 1) * 100"
+  target: "70%"
+
+personas:
+  primary:
+    name: "Sarah Chen"
+    role: "Fractional vCISO"
+    goal: "Generate credible dollar-denominated risk estimates for clients in under 10 minutes"
+    pain: "Manual Excel modeling is 2-3 hours per client; no affordable tool produces Monte Carlo distributions"
+  secondary:
+    name: "James Okonkwo"
+    role: "SMB CFO/Founder"
+    goal: "Get defensible cyber exposure dollar figure for board meeting"
+    pain: "No security background; board expects financial language; needs answer this week"
+  tertiary:
+    name: "Rachel Torres"
+    role: "Cyber Insurance Broker"
+    goal: "Pre-qualify clients with quick exposure estimates before underwriting"
+    pain: "Carrier questionnaires are 40-60 questions; no quick triage tool exists"
+
+phases:
+  - name: "Phase 1: Hackathon MVP"
+    timeline: "Feb 21-25, 2026"
+    success: "Working end-to-end flow: landing -> wizard -> API -> results dashboard, deployed on Vercel"
+    kill_threshold: "If Monte Carlo API does not return valid results for 3+ industry/revenue combos by end of Day 2, stop features and fix the engine"
+    deliverables:
+      - "Production URL on Vercel"
+      - "Landing page screenshot (1280px+)"
+      - "Explainer document"
+      - "Working end-to-end assessment flow"
+  - name: "Phase 2: Post-Hackathon Polish"
+    timeline: "Feb 26 - Mar 31, 2026"
+    success: "Scenario comparison, PDF/shareable URLs, mobile-responsive, comprehensive error handling"
+    kill_threshold: "If PDF export takes >2 weeks, drop it and focus on shareable URLs"
+    deliverables:
+      - "Scenario comparison mode"
+      - "PDF or shareable URL"
+      - "Mobile-responsive results"
+      - "Comprehensive input validation"
+  - name: "Phase 3: Growth"
+    timeline: "Apr - Jun 2026"
+    success: "User accounts, saved assessments, trend tracking, public API"
+    kill_threshold: "If registration-to-first-assessment exceeds 2 minutes, simplify auth to magic links/OAuth only"
+    deliverables:
+      - "User accounts with saved history"
+      - "Trend dashboard"
+      - "Public API with docs"
+      - "Multi-currency support"
+
+scope:
+  in_scope:
+    - "Landing page (dark-themed, trust signals, CTA)"
+    - "5-step wizard (company profile, data profile, controls, threats, review)"
+    - "Monte Carlo API (10K FAIR iterations, Zod validation)"
+    - "Results dashboard (4 KPI cards, histogram, LEC, benchmarks)"
+    - "Hardcoded lookup tables (IBM, DBIR, NetDiligence)"
+    - "Gordon-Loeb optimal spend calculation"
+  out_of_scope:
+    - "User accounts / auth"
+    - "Database / persistent storage"
+    - "PDF export"
+    - "Scenario comparison"
+    - "Shareable URLs"
+    - "Mobile-responsive layout"
+    - "Real-time threat intel"
+    - "AI-generated board summary"
+    - "Enterprise pricing / billing"
+    - "Internationalization / multi-currency"
+
+architecture:
+  pattern: "Single-page wizard -> API route -> Results dashboard"
+  state_management: "useState (wizard), sessionStorage + Context (results)"
+  api: "POST /api/calculate (Node.js serverless, 10K Monte Carlo iterations)"
+  charts: "Recharts (BarChart histogram, LineChart LEC)"
+  critical_path: "Lookup tables -> Monte Carlo engine -> API route -> Results dashboard -> Vercel deployment"
+
+principles:
+  - "Dollars, Not Scores"
+  - "Distribution, Not Point Estimate"
+  - "Transparent Methodology"
+  - "Respect the Clock"
+  - "Ship Over Perfect"

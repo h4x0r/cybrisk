@@ -1,0 +1,166 @@
+# Implementation Scaffold - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/architecture/IMPLEMENTATION_SCAFFOLD.md
+
+directory_structure:
+  root_directories: 5
+  total_files_specified: 48
+  key_directories:
+    - "src/app/"
+    - "src/components/"
+    - "src/lib/"
+    - "src/data/"
+    - "src/contexts/"
+    - "tests/"
+
+modules:
+  - id: "types"
+    file: "src/lib/types.ts"
+    role: "Root type system - all modules import from here"
+    dependencies: []
+    exports:
+      - "Industry, DataType, Control, ThreatType, RiskRating (union types)"
+      - "RevenueBand, EmployeeCount, IncidentHistory (union types)"
+      - "PertParams, FairParams (FAIR model interfaces)"
+      - "AssessmentInputs (wizard -> API)"
+      - "SimulationOutput (MC engine -> API route)"
+      - "CalculateResponse (API -> client)"
+      - "GordonLoebResult, KeyDriver, Recommendation"
+
+  - id: "lookup-tables"
+    file: "src/lib/lookup-tables.ts"
+    role: "Map questionnaire answers to PERT parameters"
+    dependencies: ["types"]
+    exports:
+      - "mapToFairParams()"
+      - "getRevenueMidpoint()"
+      - "PER_RECORD_COST, INDUSTRY_PARAMS, CONTROL_MODIFIERS"
+      - "REVENUE_MIDPOINTS, ATTACK_PATTERN_FREQ, INCIDENT_HISTORY_MULTIPLIER"
+    data_sources:
+      - "IBM Cost of a Data Breach 2025"
+      - "Verizon DBIR 2025"
+      - "NetDiligence Cyber Claims Study 2025"
+
+  - id: "monte-carlo"
+    file: "src/lib/monte-carlo.ts"
+    role: "FAIR Monte Carlo simulation engine (10K iterations)"
+    dependencies: ["types"]
+    exports:
+      - "runSimulation(params, iterations)"
+      - "samplePERT(min, mode, max, lambda)"
+      - "boxMuller()"
+    algorithms:
+      - "Joehnk Beta sampling (~20 lines, zero dependencies)"
+      - "Modified PERT distribution (lambda=4)"
+      - "Welford's running mean (avoids float overflow)"
+      - "Nearest-rank percentile"
+      - "Binary search for exceedance curve"
+    performance: "< 100ms for 10K iterations"
+
+  - id: "gordon-loeb"
+    file: "src/lib/gordon-loeb.ts"
+    role: "Optimal security spend calculation"
+    dependencies: ["types", "lookup-tables"]
+    exports:
+      - "computeGordonLoeb(aleMean, controls, revenueBand)"
+      - "estimateVulnerabilityLevel(controls)"
+    formula: "optimalSpend <= (1/e) * v * L"
+    caps:
+      - "5% of revenue (practical upper bound)"
+      - "vulnerability floor 0.05, ceiling 0.95"
+
+  - id: "validation"
+    file: "src/lib/validation.ts"
+    role: "Zod schemas shared between client and server"
+    dependencies: ["types"]
+    exports:
+      - "CompanyProfileSchema (step 0)"
+      - "DataProfileSchema (step 1)"
+      - "ThreatLandscapeSchema (step 3)"
+      - "CalculateRequestSchema (full API validation)"
+      - "CalculateRequest (inferred type)"
+
+  - id: "api-calculate"
+    file: "src/app/api/calculate/route.ts"
+    role: "Pipeline orchestrator - convergence point for all server modules"
+    dependencies: ["validation", "lookup-tables", "monte-carlo", "gordon-loeb", "types"]
+    runtime: "Node.js 20.x serverless"
+    pipeline_steps:
+      - "Parse JSON body"
+      - "Zod validation"
+      - "mapToFairParams()"
+      - "runSimulation(10K)"
+      - "Output sanity checks"
+      - "computeGordonLoeb()"
+      - "deriveRiskRating()"
+      - "identifyKeyDrivers()"
+      - "generateRecommendations()"
+      - "Build response JSON"
+
+  - id: "wizard-state-manager"
+    file: "src/app/assess/page.tsx"
+    role: "5-step wizard with parent useState"
+    dependencies: ["types", "validation", "results-context"]
+    runtime: "Browser (Client Component)"
+    state_pattern: "useState in parent, step components as children"
+
+  - id: "results-context"
+    file: "src/contexts/results-context.tsx"
+    role: "Cross-page result transfer via Context + sessionStorage"
+    dependencies: ["types"]
+    runtime: "Browser (Client Component)"
+    storage: "Dual: React Context (instant) + sessionStorage (refresh-safe)"
+
+api_routes:
+  - method: "POST"
+    path: "/api/calculate"
+    runtime: "nodejs"
+    validation: "Zod schema"
+    response_format: "CalculateResponse JSON"
+    error_codes: [400, 405, 500]
+
+cross_module_invariants:
+  - "ALE >= 0"
+  - "ALE <= 10x revenue"
+  - "Vulnerability in [0, 1]"
+  - "No rawLosses in API response"
+  - "Histogram exactly 50 bins"
+  - "LEC exactly 20 points"
+  - "Zod schema shared between client and server"
+  - "No user data in error logs"
+  - "PERT params: min <= mode <= max"
+
+config:
+  env_vars_required: 0
+  env_vars_optional:
+    - "NEXT_PUBLIC_BASE_URL"
+    - "OTEL_EXPORTER_OTLP_ENDPOINT"
+    - "OTEL_SERVICE_NAME"
+    - "ENABLE_DEBUG_MODE"
+  reason: "Stateless calculator with hardcoded lookup tables - zero runtime config needed"
+
+build_order:
+  - "types.ts"
+  - "validation.ts"
+  - "lookup-tables.ts"
+  - "monte-carlo.ts"
+  - "gordon-loeb.ts"
+  - "api/calculate/route.ts"
+  - "Wizard steps 1-5"
+  - "Results dashboard"
+  - "Landing page"
+  - "Vercel deployment"
+
+implementation_effort:
+  p0_hours: "12-15"
+  p1_hours: "4-5"
+  p2_hours: "5-7"
+  total_hours: "22-27"
+
+not_included:
+  - "BaseAgent class (not an agentic system)"
+  - "Database configuration (stateless by design)"
+  - "LLM/AI configuration (pure math engine)"
+  - "Circuit breaker / resilience patterns (Vercel handles infra)"
+  - "Streaming endpoint (single sync response)"
+  - "Health check endpoint (no persistent connections to monitor)"

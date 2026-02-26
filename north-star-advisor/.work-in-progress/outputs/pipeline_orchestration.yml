@@ -1,0 +1,96 @@
+# Pipeline Orchestration outputs for cross-referencing
+# Generated: 2026-02-22
+
+pipeline_type: "sequential_function_composition"
+orchestrator_pattern: "linear_chain"  # Not agent-based
+
+stages:
+  - id: "validate"
+    function: "CalculateRequestSchema.safeParse()"
+    file: "src/lib/validation.ts"
+    input: "unknown (raw JSON)"
+    output: "ValidatedInput | ZodError"
+    time_budget_ms: 5
+    pure: true
+
+  - id: "map_to_fair"
+    function: "mapToFairParams()"
+    file: "src/lib/lookup-tables.ts"
+    input: "ValidatedInput"
+    output: "FairParams"
+    time_budget_ms: 1
+    pure: true
+
+  - id: "simulate"
+    function: "runSimulation()"
+    file: "src/lib/monte-carlo.ts"
+    input: "FairParams, iterations=10000"
+    output: "SimulationOutput"
+    time_budget_ms: 100
+    pure: false  # stochastic
+
+  - id: "gordon_loeb"
+    function: "computeGordonLoeb()"
+    file: "src/lib/gordon-loeb.ts"
+    input: "SimulationOutput, ValidatedInput"
+    output: "GordonLoebResult"
+    time_budget_ms: 1
+    pure: true
+
+  - id: "enrich"
+    function: "deriveRiskRating() + identifyKeyDrivers() + generateRecommendations()"
+    file: "src/app/api/calculate/route.ts"
+    input: "SimulationOutput, ValidatedInput, GordonLoebResult"
+    output: "RiskRating, KeyDriver[], Recommendation[]"
+    time_budget_ms: 5
+    pure: true
+
+  - id: "sanitize"
+    function: "sanitizeOutput()"
+    file: "src/app/api/calculate/route.ts"
+    input: "SimulationOutput, ValidatedInput"
+    output: "void (mutates in place)"
+    time_budget_ms: 1
+    pure: false  # mutation
+
+validation_gates:
+  - gate: "input_validation"
+    location: "pre-pipeline"
+    library: "zod"
+    failure_mode: "HTTP 400"
+  - gate: "pert_invariants"
+    location: "post-mapping"
+    failure_mode: "silent_clamp"
+  - gate: "vuln_bounds"
+    location: "per-sample (10K times)"
+    failure_mode: "clamp_0_1"
+  - gate: "output_plausibility"
+    location: "post-simulation"
+    failure_mode: "cap_or_throw"
+
+performance:
+  total_warm_ms: 80
+  total_cold_ms: 3000
+  dominant_stage: "simulate"
+  memory_peak_kb: 90
+  response_size_kb: 5
+
+state_management:
+  wizard: "useState (client-side)"
+  results_transfer: "sessionStorage + React Context"
+  server_side: "none (stateless, process-and-forget)"
+
+error_handling:
+  strategy: "fail-fast on validation, clamp on edge cases, catch-all for unexpected"
+  retry_logic: "client-side only (retry button)"
+  fallback_calculation: "none (server-only computation)"
+
+constants:
+  iterations: 10000
+  histogram_bins: 50
+  exceedance_points: 20
+  pert_lambda: 4
+  ale_revenue_cap: "10x"
+  gordon_loeb_revenue_cap: "5%"
+  min_vulnerability: 0.02
+  min_loading_duration_ms: 1500

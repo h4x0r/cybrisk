@@ -1,0 +1,58 @@
+framework: vitest
+e2e_framework: playwright
+coverage_targets:
+  computation_unit: 95
+  component_unit: 80
+  integration: 70
+  e2e: critical_paths_only
+
+golden_scenarios: 6
+golden_categories:
+  - happy_path
+  - edge_case
+  - boundary
+  - regression
+
+unit_test_modules:
+  - file: monte-carlo.ts
+    tests: samplePERT, sampleBeta, runSimulation, buildHistogram, buildExceedanceCurve, percentile
+    min_cases: 8
+  - file: gordon-loeb.ts
+    tests: computeGordonLoeb, estimateVulnerabilityLevel
+    min_cases: 5
+  - file: lookup-tables.ts
+    tests: mapToFairParams, data source integrity
+    min_cases: 12
+  - file: validation.ts
+    tests: CalculateRequestSchema, per-step schemas
+    min_cases: 10
+
+integration_test_modules:
+  - file: api/calculate/route.ts
+    tests: valid request, invalid request, error cases, statistical invariants, golden scenarios
+    min_cases: 9
+
+cross_module_invariants:
+  - ale_non_negative
+  - ale_plausibility_cap
+  - vulnerability_bounded
+  - no_raw_losses_in_response
+  - histogram_50_bins
+  - lec_20_points
+  - percentile_ordering
+  - zod_rejects_invalid
+  - no_input_data_in_errors
+  - gordon_loeb_residual_less_than_current
+  - gordon_loeb_revenue_cap
+
+ci_platform: github_actions
+ci_jobs:
+  - name: unit-tests
+    duration: 30-60s
+    blocking: true
+  - name: integration-tests
+    duration: 30-60s
+    blocking: true
+  - name: build
+    duration: 60-90s
+    blocking: true

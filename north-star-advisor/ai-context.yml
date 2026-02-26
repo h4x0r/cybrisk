@@ -1,0 +1,140 @@
+# North Star Advisor - Progressive Strategic Context
+# This file is updated after each generation phase
+
+_meta:
+  generated_by: "north-star-advisor"
+  version: "1.0.0"
+  created_at: "2026-02-22T15:30:00+08:00"
+  last_updated: "2026-02-22T17:00:00+08:00"
+  phases_complete: [1, 2, 3, 4]
+
+project:
+  name: "CybRisk"
+  description: "Cyber risk posture calculator that translates security controls into dollar-denominated financial exposure estimates using Monte Carlo simulation"
+  version: "0.1.0"
+  target_users: "vCISOs, fractional security advisors, SMB executives, cyber insurance buyers"
+  core_problem: "Boards need cyber risk in dollars, not compliance checklists. No self-service tool provides Monte Carlo-simulated financial exposure."
+  differentiator: "Real actuarial data (IBM/DBIR/NetDiligence) + FAIR model + Monte Carlo simulation = dollar-denominated risk, not qualitative scores"
+  success_metric: "Working end-to-end flow deployed on Vercel, visually impressive for 2-minute hackathon demo"
+  tech_stack: "Next.js 14+ App Router, Tailwind + Shadcn/ui, Recharts, TypeScript Monte Carlo engine, Vercel"
+
+constraints:
+  timeline: "3-day hackathon (Feb 21-25, 2026)"
+  team: "Single developer"
+  stack_required: "Next.js on Vercel"
+  no_python: true
+  no_database: true
+
+anti_goals:
+  - "User accounts or authentication"
+  - "Persistent storage or database"
+  - "Real-time threat intelligence feeds"
+  - "Mobile-first design"
+  - "Enterprise pricing or billing"
+
+strategy:
+  beliefs:
+    - "Risk must be denominated in dollars"
+    - "Show the distribution, not just the average"
+    - "Methodology transparency is non-negotiable"
+    - "Respect the user's time and intelligence"
+    - "Honesty over impressiveness"
+  kill_list:
+    - "Compliance tool"
+    - "Audit framework"
+    - "Enterprise security software"
+    - "Real-time threat intelligence platform"
+    - "Replacement for professional risk assessment"
+
+brand:
+  voice:
+    traits: ["Direct", "Authoritative", "Honest about uncertainty", "Respectful of time", "Unimpressed by jargon"]
+    principles: ["Lead with the dollar figure", "Say estimated not predicted", "Attribute data sources", "No FUD"]
+  tagline: "Know your cyber risk in dollars, not checkboxes."
+  colors:
+    primary: "#22d3ee"
+    background: "#020617"
+    surface: "#0f172a"
+  typography:
+    ui: "Inter"
+    data: "JetBrains Mono"
+
+northstar:
+  metric:
+    name: "Assessment Completion Rate"
+    definition: "% of wizard starts that reach results dashboard"
+    target: "70%"
+  personas:
+    primary:
+      name: "Sarah Chen"
+      role: "Fractional vCISO"
+      goal: "Dollar-denominated risk estimates for clients in <10 min"
+    secondary:
+      name: "James Okonkwo"
+      role: "SMB CFO/Founder"
+      goal: "Board-ready cyber exposure figure without security expertise"
+    tertiary:
+      name: "Rachel Torres"
+      role: "Cyber Insurance Broker"
+      goal: "Quick pre-qualification exposure estimates"
+  phases:
+    phase_1:
+      name: "Hackathon MVP"
+      timeline: "Feb 21-25, 2026"
+      focus: "End-to-end flow: landing -> wizard -> API -> results"
+    phase_2:
+      name: "Post-Hackathon Polish"
+      timeline: "Feb 26 - Mar 31, 2026"
+      focus: "Scenario comparison, PDF/shareable URLs, mobile"
+    phase_3:
+      name: "Growth"
+      timeline: "Apr - Jun 2026"
+      focus: "User accounts, saved assessments, trend tracking, API"
+  principles:
+    - "Dollars, Not Scores"
+    - "Distribution, Not Point Estimate"
+    - "Transparent Methodology"
+    - "Respect the Clock"
+    - "Ship Over Perfect"
+  scope:
+    in: ["Landing page", "5-step wizard", "Monte Carlo API (10K FAIR)", "Results dashboard", "Lookup tables", "Gordon-Loeb"]
+    out: ["User accounts", "Database", "PDF export", "Scenario comparison", "Mobile-responsive", "Real-time threat intel"]
+  architecture:
+    pattern: "Wizard (useState) -> POST /api/calculate -> Results (sessionStorage + Context)"
+    critical_path: "Lookup tables -> Monte Carlo engine -> API route -> Results dashboard -> Vercel deployment"
+
+extract:
+  axioms:
+    - "Dollars > Scores: financial output always beats qualitative rating"
+    - "Distribution > Point Estimate: never show just a mean, always show the range"
+    - "Speed > Precision: useful estimate in 5 min beats perfect analysis in 5 days"
+    - "Transparency > Polish: show methodology, sources, confidence intervals"
+    - "Stateless > Persistent: no accounts, no storage, no tracking"
+  non_goals:
+    features: ["Compliance tool", "Audit framework", "Enterprise security software", "Real-time threat intel", "Professional risk assessment replacement"]
+    approaches: ["Enterprise sales motion", "Real-time data feeds", "Mobile-first", "Freemium pricing", "Client-side Monte Carlo"]
+  patterns:
+    data_flow: "Lookup Table -> PERT Params -> Monte Carlo (10K) -> Percentiles -> Visualization"
+    fallback: "MC Engine -> Simplified Deterministic -> Cached Example -> Error State"
+    conflict: "User Safety > Data Accuracy > Visual Polish > Performance"
+  always:
+    - "Dollar amounts in JetBrains Mono"
+    - "Cite data source for every actuarial figure"
+    - "Distributions alongside point estimates"
+    - "Server-side Zod validation"
+    - "Gordon-Loeb alongside ALE"
+  never:
+    - "Risk score without dollar figure"
+    - "Point estimate without distribution"
+    - "FUD marketing"
+    - "Store user data beyond request"
+    - "Gate content behind signup"
+    - "Use 'AI-powered' in copy"
+
+# Sections populated as phases complete:
+# - strategy: Phase 2 (metric, personas) -- DONE
+# - strategy: Phase 4 (axioms) -- DONE
+# - architecture: Phase 6 (pattern, agents, tech_stack)
+# - security: Phase 8 (auth, threats)
+# - roadmap: Phase 12 (phases, milestones)
+# - references: Phase 13 (document index)

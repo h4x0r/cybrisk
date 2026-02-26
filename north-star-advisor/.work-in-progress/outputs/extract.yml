@@ -1,0 +1,91 @@
+# North Star Extract - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/NORTHSTAR_EXTRACT.md
+
+axioms:
+  - id: "dollars-over-scores"
+    statement: "Dollars > Scores"
+    meaning: "When choosing between a financial output and a qualitative rating, always choose the dollar figure"
+    example: "Risk Grade (A-F) is only acceptable if the dollar ALE is more prominent"
+
+  - id: "distribution-over-point"
+    statement: "Distribution > Point Estimate"
+    meaning: "Never show just a mean; always show the range and distribution"
+    example: "ALE displayed as $1.2M (90% between $120K and $3.4M), never $1.2M alone"
+
+  - id: "speed-over-precision"
+    statement: "Speed > Precision"
+    meaning: "A useful estimate in 5 minutes beats a perfect analysis in 5 days"
+    example: "10K Monte Carlo iterations with PERT distributions, not 1M iterations with real-time feeds"
+
+  - id: "transparency-over-polish"
+    statement: "Transparency > Polish"
+    meaning: "Show methodology, data sources, and confidence intervals; never hide uncertainty"
+    example: "Every figure traceable to IBM/DBIR/NetDiligence source or FAIR calculation step"
+
+  - id: "stateless-over-persistent"
+    statement: "Stateless > Persistent"
+    meaning: "No accounts, no storage, no tracking; privacy by design"
+    example: "Serverless function processes and forgets; nothing written to disk or database"
+
+non_goals:
+  features:
+    - "Compliance tool"
+    - "Audit framework"
+    - "Enterprise security software"
+    - "Real-time threat intelligence platform"
+    - "Replacement for professional risk assessment"
+  approaches:
+    - "Enterprise sales motion"
+    - "Real-time data feeds"
+    - "Mobile-first design"
+    - "Freemium pricing model"
+    - "Client-side Monte Carlo"
+
+patterns:
+  core_data_flow: "Lookup Table -> PERT Params -> Monte Carlo (10K) -> Percentiles -> Pre-binned Buckets -> Recharts"
+  fallback_chain: "MC Engine -> Simplified Deterministic -> Cached Example -> Error State"
+  conflict_resolution: "User Safety > Data Accuracy > Visual Polish > Performance"
+
+always:
+  - "Show dollar amounts in JetBrains Mono"
+  - "Cite data source for every actuarial figure"
+  - "Display distributions alongside point estimates"
+  - "Use 'estimated' or 'simulated', never 'predicted' or 'guaranteed'"
+  - "Validate inputs server-side with Zod"
+  - "Cap outputs at plausible ranges (min $0, max 10x revenue)"
+  - "Show Gordon-Loeb recommendation alongside ALE"
+  - "Preserve wizard state on back-navigation"
+
+never:
+  - "Display a risk score without a dollar figure"
+  - "Present a point estimate without its distribution"
+  - "Use FUD (fear, uncertainty, doubt)"
+  - "Store user input data beyond request lifecycle"
+  - "Claim precision we do not have (max 2 significant digits)"
+  - "Gate content behind signup or email capture"
+  - "Use 'AI-powered' in marketing or UI copy"
+
+re_evaluation_triggers:
+  metric:
+    - signal: "Assessment Completion Rate drops"
+      threshold: "Below 50% for 3 consecutive weekly cohorts"
+      action: "Instrument wizard steps, simplify drop-off point"
+    - signal: "Calculation Success Rate drops"
+      threshold: "Below 95% for any rolling 24h period"
+      action: "Review API error logs for edge-case inputs"
+    - signal: "Time to Results exceeds threshold"
+      threshold: "P95 above 5 seconds for 1 week"
+      action: "Profile Monte Carlo engine, optimize per-iteration math"
+  external:
+    - signal: "IBM publishes Cost of a Data Breach 2026"
+      action: "Update all per-record cost lookup tables"
+    - signal: "RiskLens or FAIR Institute launches free self-service tool"
+      action: "Re-evaluate positioning; shift differentiator to Gordon-Loeb + privacy"
+    - signal: "New cyber insurance regulations"
+      action: "Evaluate FAIR implementation against requirements"
+  strategic:
+    - signal: "User base exceeds 10K monthly assessments"
+      action: "Evaluate serverless scaling and edge caching"
+    - signal: "Competing tool achieves sub-2-minute assessment with FAIR rigor"
+      action: "Study their approach; do nothing if they sacrifice methodology"

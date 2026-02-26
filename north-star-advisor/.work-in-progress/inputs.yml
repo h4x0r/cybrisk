@@ -1,0 +1,18 @@
+# North Star Advisor - Project Inputs
+# Generated: 2026-02-22T15:30:00+08:00
+
+# Core (from exploration)
+application_name: "CybRisk"
+one_line_description: "Cyber risk posture calculator that translates security controls into dollar-denominated financial exposure estimates using Monte Carlo simulation"
+target_users: "vCISOs, fractional security advisors, SMB executives/founders, cyber insurance buyers, board audit committees"
+core_problem: "Existing cyber risk tools output compliance checklists. Boards and executives need financial exposure in dollars, not checkbox scores. No self-service SaaS translates security posture into probable financial loss."
+differentiator: "Financial risk quantification using FAIR methodology + Monte Carlo simulation + real actuarial data (IBM/Verizon DBIR/NetDiligence). Not another compliance checklist — a board-ready financial exposure calculator."
+
+# Structured (from targeted questions)
+tech_stack: "Next.js 14+ (App Router), Tailwind CSS + Shadcn/ui, Recharts, Lucide React, TypeScript Monte Carlo engine, Vercel deployment"
+constraints: "3-day hackathon (Feb 21-25, 2026), single developer, must use Next.js, must deploy on Vercel, no Python backend, stateless (no DB required)"
+anti_goals: "User accounts/auth, persistent storage/database, real-time threat intelligence feeds, PDF export (stretch only), mobile-first design, enterprise pricing"
+success_metric: "Working end-to-end flow: landing page → 5-step wizard → Monte Carlo calculation → results dashboard with charts. Deployed and publicly accessible on Vercel. Visually impressive enough for 2-minute hackathon demo."
+
+# Phase decisions (populated during generation)
+phase_decisions: {}

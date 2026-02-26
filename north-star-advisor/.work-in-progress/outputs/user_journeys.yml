@@ -1,0 +1,173 @@
+# User Journeys - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/USER_JOURNEYS.md
+
+journey_type: "stateless"
+auth_required: false
+saved_state: false
+
+phases:
+  - name: "Landing Page"
+    route: "/"
+    duration: "~30s"
+    emotional_state: "Skepticism -> Curiosity"
+    conversion_target: "30% click-through to /assess"
+    key_elements:
+      - "Hero headline with dollar-denominated value prop"
+      - "Trust signals (credentials, methodology, no-signup)"
+      - "How It Works (3-step diagram)"
+      - "CTA: Assess Your Risk"
+
+  - name: "Wizard Step 1: Company Profile"
+    route: "/assess"
+    duration: "~30s"
+    emotional_state: "Oriented"
+    fields:
+      - "Industry sector (dropdown, 12 options)"
+      - "Annual revenue (range bands)"
+      - "Employee count (range bands)"
+    drop_off_target: "5%"
+
+  - name: "Wizard Step 2: Data Profile"
+    route: "/assess"
+    duration: "~45s"
+    emotional_state: "Engaged"
+    fields:
+      - "Data types handled (multi-select)"
+      - "Approximate record count (range bands)"
+      - "Data sensitivity level (radio)"
+    drop_off_target: "8%"
+
+  - name: "Wizard Step 3: Security Controls"
+    route: "/assess"
+    duration: "~60s"
+    emotional_state: "Evaluating"
+    fields:
+      - "MFA (yes/no)"
+      - "EDR (yes/no)"
+      - "Security awareness training (yes/no)"
+      - "Incident response plan (yes/no)"
+      - "Vulnerability scanning (yes/no)"
+      - "Data encryption (yes/no)"
+      - "Backup and recovery (yes/no)"
+      - "Network segmentation (yes/no)"
+    drop_off_target: "10%"
+    drop_off_risk: "Highest cognitive load step for non-technical users"
+
+  - name: "Wizard Step 4: Threat Landscape"
+    route: "/assess"
+    duration: "~45s"
+    emotional_state: "Thoughtful"
+    fields:
+      - "Top threats (industry smart defaults)"
+      - "Regulatory environment (multi-select)"
+      - "Prior incident history (optional radio)"
+    drop_off_target: "5%"
+    smart_defaults: true
+
+  - name: "Wizard Step 5: Review & Calculate"
+    route: "/assess"
+    duration: "~30s"
+    emotional_state: "Committed"
+    key_elements:
+      - "Input summary cards with edit links"
+      - "Calculate My Risk CTA button"
+      - "Privacy reassurance text"
+    drop_off_target: "2%"
+
+  - name: "Processing"
+    route: "/assess"
+    duration: "1-3s"
+    emotional_state: "Anxious anticipation"
+    key_elements:
+      - "Animated progress bar"
+      - "Rotating methodology status messages"
+      - "5s: slower-than-expected message"
+      - "10s: retry button"
+
+  - name: "Results Dashboard"
+    route: "/results"
+    duration: "open-ended (1-3 min typical)"
+    emotional_state: "Relieved -> Informed -> Trusting"
+    information_hierarchy:
+      - "ALE headline with 90% confidence interval"
+      - "4 KPI cards (ALE median, PML 95th, optimal spend, risk rating)"
+      - "Loss distribution histogram"
+      - "Loss exceedance curve"
+      - "Key drivers and recommendations"
+      - "Methodology and sources"
+
+total_time_to_value: "< 5 minutes"
+
+persona_journey_times:
+  sarah_chen:
+    role: "Fractional vCISO"
+    wizard_time: "~2 min"
+    results_time: "~2 min"
+    total: "~3 min"
+    primary_artifact: "Screenshot of KPI cards + histogram"
+    repeat_behavior: "Multiple clients per session"
+  james_okonkwo:
+    role: "SMB CFO/Founder"
+    wizard_time: "~3.5 min"
+    results_time: "~1.5 min"
+    total: "~5 min"
+    primary_artifact: "Screenshot of ALE + Gordon-Loeb spend gap"
+    repeat_behavior: "What-if with different controls"
+  rachel_torres:
+    role: "Cyber Insurance Broker"
+    wizard_time: "~2 min"
+    results_time: "~2 min"
+    total: "~3 min"
+    primary_artifact: "PML 95th vs policy limit comparison"
+    repeat_behavior: "Portfolio of clients in single sitting"
+
+error_recovery:
+  client_side:
+    - type: "Missing required field"
+      recovery: "Inline error, prevent step advance"
+    - type: "Invalid value"
+      recovery: "Inline error with guidance"
+    - type: "Accidental page refresh"
+      recovery: "Wizard resets (accepted tradeoff for stateless design)"
+  server_side:
+    - type: "400 Bad Request"
+      recovery: "Navigate back to relevant step with error"
+    - type: "500 Internal Server Error"
+      recovery: "Retry button + Edit Inputs button"
+    - type: "504 Gateway Timeout"
+      recovery: "Retry button (cold start resolves on second attempt)"
+    - type: "Network error"
+      recovery: "Check connection message + Retry button"
+  edge_case_warnings:
+    - type: "Extreme PERT parameters"
+      recovery: "Non-blocking warning banner"
+    - type: "All controls OFF"
+      recovery: "Non-blocking warning about maximum exposure"
+
+funnel_targets:
+  landing_to_wizard: "30%"
+  step_1_completion: "95%"
+  step_2_completion: "92%"
+  step_3_completion: "90%"
+  step_4_completion: "95%"
+  step_5_to_results: "98%"
+  api_success_rate: "99.5%"
+  overall_completion: "70%"
+
+implementation_priorities:
+  p0:
+    - "Monte Carlo API endpoint"
+    - "Lookup tables (hardcoded)"
+    - "Wizard Steps 1-5 with useState"
+    - "Results dashboard (KPI cards + charts)"
+  p1:
+    - "Landing page"
+    - "Processing animation"
+    - "Inline validation (per-step)"
+    - "Smart defaults (Step 4)"
+  p2:
+    - "Gordon-Loeb card"
+    - "Methodology section"
+    - "Error recovery (retry)"
+    - "Run Another Assessment button"

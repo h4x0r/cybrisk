@@ -1,0 +1,91 @@
+# UI Design System - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/UI_DESIGN_SYSTEM.md
+
+framework:
+  runtime: "Next.js 14+ App Router"
+  styling: "Tailwind CSS v4"
+  components: "Shadcn/ui (new-york style)"
+  charts: "Recharts"
+  icons: "Lucide React"
+  fonts:
+    sans: "Inter (--font-inter)"
+    mono: "JetBrains Mono (--font-jetbrains)"
+
+colors:
+  background: "#020617"         # slate-950
+  surface: "#0f172a"            # slate-900
+  elevated: "#1e293b"           # slate-800
+  primary: "#22d3ee"            # cyan-400
+  primary_hover: "#67e8f9"      # cyan-300
+  primary_subtle: "cyan-400/10"
+  positive: "#34d399"           # emerald-400
+  warning: "#fbbf24"            # amber-400
+  danger: "#f43f5e"             # rose-500
+  high_risk: "#fb923c"          # orange-400
+  text_primary: "#f8fafc"       # slate-50
+  text_secondary: "#94a3b8"     # slate-400
+  text_muted: "#64748b"         # slate-500
+  border: "#334155"             # slate-700
+  border_strong: "#475569"      # slate-600
+
+risk_levels:
+  - level: "LOW"
+    color: "emerald-400"
+    hex: "#34d399"
+    icon: "ShieldCheck"
+  - level: "MODERATE"
+    color: "amber-400"
+    hex: "#fbbf24"
+    icon: "AlertTriangle"
+  - level: "HIGH"
+    color: "orange-400"
+    hex: "#fb923c"
+    icon: "AlertTriangle"
+  - level: "CRITICAL"
+    color: "rose-500"
+    hex: "#f43f5e"
+    icon: "ShieldAlert"
+
+components:
+  - name: "RiskRatingBadge"
+    path: "src/components/results/risk-rating-badge.tsx"
+    description: "Large pill badge indicating risk severity (LOW/MODERATE/HIGH/CRITICAL)"
+  - name: "KpiCard"
+    path: "src/components/results/kpi-card.tsx"
+    description: "Metric card with label, dollar figure in JetBrains Mono, and trend indicator"
+  - name: "WizardProgress"
+    path: "src/components/assess/wizard-progress.tsx"
+    description: "Horizontal step indicator with numbered circles, checkmarks, and connecting lines"
+  - name: "WizardStepCard"
+    path: "src/components/assess/wizard-step-card.tsx"
+    description: "Card wrapper for each wizard step with number, title, description, and form fields"
+  - name: "ChartContainer"
+    path: "src/components/results/chart-container.tsx"
+    description: "Card wrapper for Recharts components with consistent title/subtitle/padding"
+  - name: "SimulationLoading"
+    path: "src/components/assess/simulation-loading.tsx"
+    description: "Loading state showing animated pulse ring and cycling simulation phase text"
+  - name: "TrustBadge"
+    path: "src/components/shared/trust-badge.tsx"
+    description: "Small pill badge for trust signals (FAIR Methodology, Data Never Stored, etc.)"
+
+chart_theme:
+  path: "src/lib/chart-theme.ts"
+  colors:
+    primary: "#22d3ee"
+    positive: "#34d399"
+    warning: "#fbbf24"
+    danger: "#f43f5e"
+    grid: "#1e293b"
+    text: "#94a3b8"
+
+layouts:
+  landing: "max-w-6xl mx-auto, sections at py-24"
+  wizard: "max-w-2xl mx-auto, single column"
+  results_kpi: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+  results_charts: "grid grid-cols-1 lg:grid-cols-2 gap-6"
+  results_page: "max-w-7xl mx-auto"
+
+theme: "dark-only"
+design_aesthetic: "Bloomberg terminal meets modern SaaS"

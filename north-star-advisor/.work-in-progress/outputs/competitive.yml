@@ -1,0 +1,97 @@
+# Competitive Landscape - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/COMPETITIVE_LANDSCAPE.md
+
+category: "self-service cyber risk quantification (CRQ)"
+
+positioning:
+  axes:
+    x: "Speed to Insight"
+    y: "Financial Rigor"
+  quadrant: "High Speed + High Rigor (top-right)"
+  statement: "The only free, self-service tool combining FAIR methodology, Monte Carlo simulation, and published actuarial data to produce dollar-denominated exposure in under 5 minutes"
+
+direct_competitors:
+  - name: "FAIR-U"
+    org: "FAIR Institute"
+    pricing: "Free (account required)"
+    time_to_insight: "30-60 minutes"
+    financial_rigor: "Medium"
+    key_gap: "No Monte Carlo, no built-in actuarial data, manual parameter sourcing"
+  - name: "RiskLens"
+    org: "RiskLens"
+    pricing: "$100K-$500K+/year"
+    time_to_insight: "Days to weeks"
+    financial_rigor: "High"
+    key_gap: "Enterprise-only, requires dedicated analyst, no self-service"
+  - name: "Safe Security"
+    org: "Safe Security"
+    pricing: "$80K-$300K+/year"
+    time_to_insight: "Weeks"
+    financial_rigor: "High"
+    key_gap: "Enterprise-only, requires security tool integrations, no self-service"
+
+category_adjacent:
+  - name: "SecurityScorecard / BitSight"
+    type: "External risk ratings"
+    key_gap: "Letter grades, not dollars"
+  - name: "Balbix"
+    type: "AI-based CRQ"
+    key_gap: "Enterprise, requires agent deployment"
+  - name: "Axio360"
+    type: "CRQ platform"
+    key_gap: "Mid-to-enterprise pricing, requires setup"
+
+indirect_competitors:
+  - name: "Excel spreadsheets"
+    displacement_time: "2-3 hours per assessment"
+  - name: "Big 4 consulting"
+    displacement_cost: "$50K-$200K per engagement"
+  - name: "Do nothing"
+    note: "Most common competitor; most SMBs do not quantify cyber risk"
+
+differentiators:
+  unique:
+    - "Gordon-Loeb optimal security spend calculation (no competitor offers this)"
+    - "Built-in actuarial data from IBM/DBIR/NetDiligence (no user-sourced parameters)"
+    - "Stateless, no-account, privacy-by-design architecture"
+  strong:
+    - "5-minute self-service with 10K Monte Carlo iterations"
+    - "Free with no pricing tier"
+    - "Transparent methodology with source attribution"
+
+gaps:
+  - area: "Continuous monitoring"
+    better_competitor: "Safe Security, SecurityScorecard"
+  - area: "Deep scenario modeling"
+    better_competitor: "RiskLens"
+  - area: "Security stack integration"
+    better_competitor: "Safe Security, Balbix"
+  - area: "Regulatory-grade audit trail"
+    better_competitor: "RiskLens, Axio360"
+  - area: "Real-time threat intelligence"
+    better_competitor: "Safe Security"
+
+threats:
+  - "RiskLens launches a free tier"
+  - "FAIR Institute improves FAIR-U with Monte Carlo"
+  - "AI-native CRQ startup enters market"
+  - "Cyber insurance carriers build in-house tools"
+
+market_segments:
+  primary:
+    - segment: "vCISOs / Fractional CISOs"
+      size: "~15,000 US practitioners"
+    - segment: "SMB executives (< 500 employees)"
+      size: "~6 million US businesses"
+  secondary:
+    - segment: "Cyber insurance brokers"
+      size: "~3,000 US agencies"
+    - segment: "MSPs / MSSPs"
+      size: "~40,000 US"
+
+market_timing:
+  - "SEC cybersecurity disclosure rules driving demand for financial risk language"
+  - "Cyber insurance underwriting hardening requires quantified exposure"
+  - "vCISO market growing 30%+ YoY with no affordable tooling"
+  - "FAIR awareness peaking without affordable implementation"

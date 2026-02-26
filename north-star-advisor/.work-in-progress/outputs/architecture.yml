@@ -1,0 +1,170 @@
+# Architecture Blueprint - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/ARCHITECTURE_BLUEPRINT.md
+
+pattern: "Single-page wizard -> API route -> Results dashboard"
+runtime: "Node.js 20.x serverless (not Edge)"
+
+routes:
+  - path: "/"
+    rendering: "Server Component (SSG)"
+    runtime: "Edge (CDN)"
+    purpose: "Landing page"
+  - path: "/assess"
+    rendering: "Client Component"
+    runtime: "Browser"
+    purpose: "5-step wizard"
+  - path: "/results"
+    rendering: "Client Component"
+    runtime: "Browser"
+    purpose: "Results dashboard"
+  - path: "/api/calculate"
+    rendering: "Node.js serverless"
+    runtime: "nodejs20.x"
+    purpose: "Monte Carlo simulation"
+
+state_management:
+  wizard: "useState in parent component"
+  results_transfer: "sessionStorage + React Context"
+  persistent_storage: "None (stateless by design)"
+
+api:
+  endpoint: "POST /api/calculate"
+  request_fields:
+    - "industry"
+    - "revenueBand"
+    - "employeeCount"
+    - "dataTypes"
+    - "recordCount"
+    - "dataSensitivity"
+    - "controls (10 booleans)"
+    - "threatTypes"
+    - "previousIncidents"
+  response_fields:
+    - "riskRating"
+    - "ale (mean, median, p5, p10, p90, p95)"
+    - "pml"
+    - "gordonLoeb (optimalSpend, currentRisk, residualRisk)"
+    - "histogram (50 bins)"
+    - "exceedanceCurve (20 points)"
+    - "keyDrivers"
+    - "recommendations"
+    - "metadata"
+
+monte_carlo:
+  iterations: 10000
+  distribution: "Modified PERT (Joehnk algorithm for Beta sampling)"
+  fair_factors:
+    - "TEF (Threat Event Frequency)"
+    - "Vulnerability"
+    - "LEF (Loss Event Frequency = TEF * Vuln)"
+    - "Primary Loss"
+    - "Secondary Loss"
+    - "Loss Magnitude (PL + SL)"
+    - "Annual Loss (LEF * LM)"
+  performance:
+    warm_execution: "< 100ms"
+    cold_start: "1-3s"
+    memory: "~80KB for loss array"
+
+tech_stack:
+  framework: "Next.js 14+ App Router"
+  language: "TypeScript (strict mode)"
+  styling: "Tailwind CSS v4"
+  components: "Shadcn/ui (new-york)"
+  charts: "Recharts"
+  icons: "Lucide React"
+  forms: "React Hook Form + Zod + @hookform/resolvers"
+  fonts: "Inter (UI) + JetBrains Mono (data)"
+  hosting: "Vercel Hobby (Fluid Compute, 300s timeout)"
+
+files:
+  lib:
+    - "src/lib/utils.ts"
+    - "src/lib/monte-carlo.ts"
+    - "src/lib/lookup-tables.ts"
+    - "src/lib/gordon-loeb.ts"
+    - "src/lib/types.ts"
+    - "src/lib/validation.ts"
+    - "src/lib/chart-theme.ts"
+    - "src/lib/a11y-utils.ts"
+    - "src/lib/use-reduced-motion.ts"
+  components:
+    landing:
+      - "src/components/landing/hero.tsx"
+      - "src/components/landing/features.tsx"
+      - "src/components/landing/how-it-works.tsx"
+      - "src/components/landing/trust-signals.tsx"
+      - "src/components/landing/footer.tsx"
+    assess:
+      - "src/components/assess/wizard-progress.tsx"
+      - "src/components/assess/wizard-step-card.tsx"
+      - "src/components/assess/company-profile.tsx"
+      - "src/components/assess/data-profile.tsx"
+      - "src/components/assess/security-controls.tsx"
+      - "src/components/assess/threat-landscape.tsx"
+      - "src/components/assess/review-calculate.tsx"
+      - "src/components/assess/simulation-loading.tsx"
+      - "src/components/assess/a11y-announcer.tsx"
+    results:
+      - "src/components/results/risk-rating-badge.tsx"
+      - "src/components/results/kpi-card.tsx"
+      - "src/components/results/loss-distribution.tsx"
+      - "src/components/results/loss-exceedance.tsx"
+      - "src/components/results/key-drivers.tsx"
+      - "src/components/results/recommendations.tsx"
+      - "src/components/results/methodology.tsx"
+      - "src/components/results/chart-container.tsx"
+
+critical_path:
+  - "types.ts"
+  - "lookup-tables.ts"
+  - "monte-carlo.ts"
+  - "gordon-loeb.ts"
+  - "api/calculate/route.ts"
+  - "validation.ts"
+  - "Wizard Steps 1-5"
+  - "Results Dashboard"
+  - "Landing Page"
+  - "Vercel Deployment"
+
+implementation_effort:
+  p0_hours: 17
+  p1_hours: 4.5
+  p2_hours: 5.5
+  total_hours: 27
+
+security:
+  - "Zod server-side validation on all inputs"
+  - "Numeric bounds (recordCount: 1K-100M)"
+  - "Strict enum constraints (no arbitrary strings)"
+  - "Output capping at 10x revenue"
+  - "Field destructuring (no prototype pollution)"
+  - "No eval or dynamic code execution"
+  - "No data persistence (privacy by design)"
+  - "No external API calls from serverless function"
+
+performance_targets:
+  landing_lcp: "< 1.5s"
+  wizard_tti: "< 2.0s"
+  api_warm: "< 200ms"
+  api_cold: "< 3s"
+  results_render: "< 500ms"
+  total_time_to_value: "< 5 minutes"
+
+accessibility:
+  target: "WCAG 2.1 Level AA"
+  key_patterns:
+    - "Semantic landmarks on all pages"
+    - "Dynamic page titles per route"
+    - "Chart sr-only data table alternatives"
+    - "Dollar value aria-label overrides"
+    - "Risk levels: color + text + icon (never color alone)"
+    - "prefers-reduced-motion support"
+
+data_sources:
+  - "IBM Cost of a Data Breach 2025"
+  - "Verizon DBIR 2025"
+  - "NetDiligence Cyber Claims Study 2025"
+  - "FAIR Institute methodology"
+  - "Gordon-Loeb Model"

@@ -1,0 +1,101 @@
+# Handoff Protocol outputs for cross-referencing
+# Generated: 2026-02-22
+
+handoff_boundaries:
+  - id: H1
+    name: "Wizard -> API"
+    source: "assess/page.tsx (Wizard State Manager)"
+    target: "api/calculate/route.ts (API Route)"
+    transport: "HTTP POST (JSON)"
+    schema: "WizardToApiPayload"
+    validation: "Zod CalculateRequestSchema (server-side)"
+    size: "< 1KB"
+
+  - id: H2
+    name: "Raw JSON -> Validated Object"
+    source: "request.json() (unknown)"
+    target: "ValidatedCalculateRequest (typed)"
+    transport: "In-process (Zod safeParse)"
+    schema: "CalculateRequestSchema"
+    validation: "Zod runtime validation"
+    failure_response: "400 { error, details: ZodIssue[] }"
+
+  - id: H3
+    name: "Validated Input -> FAIR Parameters"
+    source: "ValidatedCalculateRequest"
+    target: "FairParams"
+    transport: "In-process (function call)"
+    schema: "FairParams { tef, vuln, pl, sl }"
+    validation: "TypeScript compiler (compile-time)"
+    invariants:
+      - "min <= mode <= max for all PERT sets"
+      - "vuln.max <= 1.0"
+      - "vuln.mode >= 0.02"
+
+  - id: H4
+    name: "FAIR Params -> Simulation Output"
+    source: "FairParams"
+    target: "SimulationOutput"
+    transport: "In-process (function call)"
+    schema: "SimulationOutput { ale, histogram, exceedanceCurve, rawLosses }"
+    validation: "TypeScript compiler (compile-time)"
+    invariants:
+      - "histogram.length === 50"
+      - "exceedanceCurve.length === 20"
+      - "rawLosses.length === iterations"
+      - "rawLosses never crosses API boundary"
+
+  - id: H5
+    name: "API -> Client"
+    source: "api/calculate/route.ts"
+    target: "assess/page.tsx -> results-context.tsx"
+    transport: "HTTP Response (JSON)"
+    schema: "CalculateResponse"
+    validation: "Sanity checks before Response.json()"
+    size: "3-5KB"
+    sanity_checks:
+      - "ale.mean >= 0"
+      - "ale.mean <= 10 * revenueMidpoint"
+      - "histogram.length === 50"
+      - "exceedanceCurve.length === 20"
+
+  - id: H6
+    name: "Context -> Charts"
+    source: "results-context.tsx (React Context)"
+    target: "results/*.tsx (Chart Components)"
+    transport: "React props"
+    schema: "Typed slices of CalculateResponse"
+    validation: "TypeScript compiler (compile-time)"
+
+pipeline_topology: "linear_dag"
+circular_dependencies: false
+dynamic_routing: false
+agent_delegation: false
+
+error_model: "fail_fast_fail_loud"
+error_responses:
+  - status: 400
+    condition: "Zod validation failure"
+    body: "{ error, details: ZodIssue[] }"
+  - status: 405
+    condition: "Non-POST method"
+    body: "{ error: 'Method not allowed' }"
+  - status: 500
+    condition: "Computation error"
+    body: "{ error, message }"
+
+pipeline_constraints:
+  max_api_calls_per_assessment: 1
+  max_iterations: 10000
+  api_timeout_ms: 300000
+  client_fetch_timeout_ms: 30000
+  max_response_size_bytes: 50000
+
+recovery_strategies:
+  - "Zod error -> navigate to offending wizard step"
+  - "Server error -> retry button + edit inputs button"
+  - "Network timeout -> retry button"
+  - "Network offline -> connection check message"
+  - "Missing results -> redirect to /assess"
+  - "Corrupt sessionStorage -> redirect to /assess"
+  - "sessionStorage unavailable -> Context-only (no refresh resilience)"

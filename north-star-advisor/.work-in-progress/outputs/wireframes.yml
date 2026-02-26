@@ -1,0 +1,157 @@
+screens:
+  - id: 1
+    name: "Landing Page"
+    route: "/"
+    sections:
+      - hero
+      - trust_badges
+      - feature_cards
+      - how_it_works
+      - builder_credit
+      - footer
+    components:
+      - CybRiskLogo
+      - TrustBadge
+      - Button (primary, large)
+      - Card (feature)
+
+  - id: 2
+    name: "Wizard Step 1: Company Profile"
+    route: "/assess"
+    fields:
+      - industry_sector (Select, 17 options)
+      - revenue_band (Select, 5 options)
+      - employee_count (Select, 5 options)
+    components:
+      - WizardProgress
+      - WizardStepCard
+      - Select (x3)
+      - Button (Continue)
+
+  - id: 3
+    name: "Wizard Step 2: Data Profile"
+    route: "/assess"
+    fields:
+      - data_types (multi-select cards, 6 types)
+      - record_count (Slider, logarithmic, 10K-100M)
+      - data_sensitivity (toggle group, 3 levels)
+    components:
+      - WizardProgress
+      - WizardStepCard
+      - Toggleable card grid
+      - Slider
+      - ToggleGroup
+      - Button (Back, Continue)
+
+  - id: 4
+    name: "Wizard Step 3: Security Controls"
+    route: "/assess"
+    fields:
+      - mfa (Switch)
+      - encryption (Switch)
+      - edr (Switch)
+      - siem (Switch)
+      - ir_plan (Switch)
+      - backup_dr (Switch)
+      - security_training (Switch)
+      - vuln_scanning (Switch)
+      - network_segmentation (Switch)
+      - waf (Switch)
+    components:
+      - WizardProgress
+      - WizardStepCard
+      - Switch toggle rows (x10)
+      - Button (Back, Continue)
+
+  - id: 5
+    name: "Wizard Step 4: Threat Landscape"
+    route: "/assess"
+    fields:
+      - threat_types (multi-select cards, 6 types, smart defaults by industry)
+      - previous_incidents (Select, 4 options, default 0)
+    components:
+      - WizardProgress
+      - WizardStepCard
+      - Toggleable card grid
+      - Select
+      - Button (Back, Continue)
+
+  - id: 6
+    name: "Wizard Step 5: Review & Calculate"
+    route: "/assess"
+    sections:
+      - company_summary_card (with Edit link)
+      - data_summary_card (with Edit link)
+      - controls_summary_card (with Edit link)
+      - threats_summary_card (with Edit link)
+      - calculate_cta
+    components:
+      - WizardProgress
+      - WizardStepCard
+      - Summary cards (x4)
+      - Button (Calculate My Risk, large)
+
+  - id: 7
+    name: "Processing State"
+    route: "/assess (overlay)"
+    elements:
+      - pulse_icon (Activity, animate-pulse)
+      - ping_ring (animate-ping)
+      - headline ("Running 10,000 simulations...")
+      - phase_text (6 phases, 800ms rotation)
+      - trust_signals
+      - timeout_message (5s)
+      - retry_buttons (10s)
+    components:
+      - SimulationLoading
+
+  - id: 8
+    name: "Results Dashboard"
+    route: "/results"
+    sections:
+      - context_bar
+      - heading_with_badge
+      - ale_headline
+      - kpi_cards_row (4 cards)
+      - charts_row (histogram + exceedance)
+      - key_drivers
+      - recommendations
+      - footer_cta (Recalculate + Share)
+      - methodology
+      - footer
+    components:
+      - RiskRatingBadge
+      - KpiCard (x4)
+      - ChartContainer (x2)
+      - BarChart (Recharts)
+      - LineChart (Recharts)
+      - Recommendations list
+      - Key Drivers list
+      - Button (Recalculate, Share)
+
+total_screens: 8
+total_routes: 3
+estimated_implementation_hours: "12-15"
+
+design_tokens_used:
+  background: "slate-950 (#020617)"
+  surface: "slate-900 (#0f172a)"
+  elevated: "slate-800 (#1e293b)"
+  accent: "cyan-400 (#22d3ee)"
+  text_primary: "slate-50 (#f8fafc)"
+  text_secondary: "slate-400 (#94a3b8)"
+  text_muted: "slate-500 (#64748b)"
+  risk_low: "emerald-400 (#34d399)"
+  risk_moderate: "amber-400 (#fbbf24)"
+  risk_high: "orange-400 (#fb923c)"
+  risk_critical: "rose-500 (#f43f5e)"
+  font_ui: "Inter"
+  font_data: "JetBrains Mono"
+
+banned_elements_verified:
+  - "No compliance checklists"
+  - "No letter grades"
+  - "No AI-powered badges"
+  - "No gamification"
+  - "No stock photography"
+  - "No signup gates"

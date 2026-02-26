@@ -1,0 +1,61 @@
+# Brand Guidelines - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/BRAND_GUIDELINES.md
+
+name: "CybRisk"
+full_name: "CybRisk -- Cyber Risk Posture Calculator"
+tagline: "Know your cyber risk in dollars, not checkboxes."
+
+positioning:
+  category: "self-service cyber risk calculator"
+  value_prop: "translates security posture into dollar-denominated financial exposure estimates"
+  target_audience: "vCISOs, fractional security advisors, SMB executives, cyber insurance buyers"
+  differentiator: "Monte Carlo simulation with real actuarial data producing probabilistic financial loss distributions"
+
+beliefs:
+  - "Risk must be denominated in dollars"
+  - "Show the distribution, not just the average"
+  - "Methodology transparency is non-negotiable"
+  - "Respect the user's time and intelligence"
+  - "Honesty over impressiveness"
+
+kill_list:
+  - "Compliance tool"
+  - "Audit framework"
+  - "Enterprise security software"
+  - "Real-time threat intelligence platform"
+  - "Replacement for professional risk assessment"
+
+voice:
+  traits:
+    - "Direct"
+    - "Authoritative"
+    - "Honest about uncertainty"
+    - "Respectful of user's time"
+    - "Unimpressed by jargon"
+  principles:
+    - "Lead with the dollar figure"
+    - "Say estimated or simulated, never predicted or guaranteed"
+    - "Attribute data sources explicitly"
+    - "No fear, uncertainty, or doubt (FUD)"
+
+colors:
+  background: "#020617"       # slate-950
+  surface: "#0f172a"          # slate-900
+  primary: "#22d3ee"          # cyan-400
+  positive: "#34d399"         # emerald-400
+  warning: "#fbbf24"          # amber-400
+  danger: "#f43f5e"           # rose-500
+  text_primary: "#f8fafc"     # slate-50
+  text_secondary: "#94a3b8"   # slate-400
+
+typography:
+  ui: "Inter"
+  data: "JetBrains Mono"
+
+license: "MIT"
+
+builder:
+  name: "Albert Hui"
+  title: "Chief Forensicator, Security Ronin"
+  credentials: "20+ years DFIR, IR, risk advisory, expert witness, vCISO, IoD Cyber Security Advisor"

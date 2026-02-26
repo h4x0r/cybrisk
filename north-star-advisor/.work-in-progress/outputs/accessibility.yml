@@ -1,0 +1,102 @@
+# Accessibility Specification - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/ACCESSIBILITY.md
+
+wcag_target: "2.1 Level AA"
+
+screen_readers:
+  primary: "VoiceOver (macOS + Safari)"
+  secondary: "NVDA (Windows + Firefox)"
+
+pages_tested:
+  - path: "/"
+    title: "CybRisk -- Cyber Risk Posture Calculator"
+    landmarks: ["banner (header)", "main", "contentinfo (footer)"]
+  - path: "/assess"
+    title: "Step N of 5: {Step Name} -- Risk Assessment -- CybRisk"
+    landmarks: ["banner (header)", "navigation (progress)", "region (step card)", "main"]
+  - path: "/results"
+    title: "Your Risk Assessment Results -- CybRisk"
+    landmarks: ["banner (header)", "main", "region (metrics)", "region (charts)", "region (recommendations)"]
+
+contrast_audit:
+  passing:
+    - combination: "Slate-50 on Slate-950"
+      ratio: "17.4:1"
+      level: "AAA"
+    - combination: "Cyan-400 on Slate-950"
+      ratio: "10.1:1"
+      level: "AAA"
+    - combination: "Slate-400 on Slate-950"
+      ratio: "5.3:1"
+      level: "AA"
+    - combination: "Emerald-400 on Slate-950"
+      ratio: "9.2:1"
+      level: "AAA"
+    - combination: "Amber-400 on Slate-950"
+      ratio: "11.8:1"
+      level: "AAA"
+    - combination: "Rose-500 on Slate-950"
+      ratio: "5.7:1"
+      level: "AA"
+  remediation_required:
+    - issue: "Slate-500 muted text"
+      ratio: "3.7:1"
+      fix: "Use only for large text (18px+); use Slate-400 for body-size muted text"
+    - issue: "Switch track unchecked state"
+      fix: "Add border-slate-500 for 3:1 contrast"
+
+key_patterns:
+  charts: "aria-hidden SVG + sr-only companion data table"
+  dollar_values: "aria-label override for abbreviated values ($1.2M); full values ($1,250,000) read correctly natively"
+  risk_badges: "color + text label + icon shape (never color alone)"
+  wizard_progress: "nav element with aria-current=step and sr-only status prefixes"
+  loading_state: "role=status + aria-live=polite phase announcements at 1000ms"
+  focus_management: "Step title focus on advance; results heading focus on page load"
+  reduced_motion: "prefers-reduced-motion CSS + usePrefersReducedMotion React hook"
+
+implementation_effort:
+  p0_hours: 3.5
+  p1_hours: 4.0
+  p2_hours: 1.5
+  total_hours: 9.0
+
+files_to_create:
+  - "src/lib/a11y-utils.ts"
+  - "src/lib/use-reduced-motion.ts"
+  - "src/components/assess/a11y-announcer.tsx"
+
+files_to_modify:
+  - "src/app/layout.tsx"
+  - "src/app/globals.css"
+  - "src/app/page.tsx"
+  - "src/app/assess/page.tsx"
+  - "src/app/results/page.tsx"
+  - "src/components/assess/wizard-progress.tsx"
+  - "src/components/assess/wizard-step-card.tsx"
+  - "src/components/assess/simulation-loading.tsx"
+  - "src/components/results/risk-rating-badge.tsx"
+  - "src/components/results/kpi-card.tsx"
+  - "src/components/results/loss-distribution.tsx"
+  - "src/components/results/loss-exceedance.tsx"
+  - "src/components/results/industry-benchmark.tsx"
+
+radix_ui_covers:
+  - "Button keyboard activation"
+  - "Select combobox ARIA"
+  - "Switch role and aria-checked"
+  - "Slider role and value attributes"
+  - "Label form association"
+  - "Popover focus trapping"
+
+custom_work_required:
+  - "Skip navigation link"
+  - "Page titles per route"
+  - "Wizard progress nav ARIA"
+  - "Chart data table alternatives"
+  - "Loading state aria-live regions"
+  - "Reduced motion suppression"
+  - "Dollar value aria-labels"
+  - "Threat card checkbox ARIA"
+  - "Validation error announcements"
+  - "Focus management (step transitions, results load)"

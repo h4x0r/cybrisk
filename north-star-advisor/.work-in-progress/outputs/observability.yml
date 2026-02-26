@@ -1,0 +1,83 @@
+# CybRisk Observability Outputs
+# Generated: 2026-02-22
+
+logging_strategy: "Structured console.log with JSON format; Vercel Function Logs"
+logging_backend_hackathon: "Vercel built-in function logs (Hobby plan, 1h retention)"
+logging_backend_production: "Vercel Log Drain to Axiom or Datadog (Pro plan, 30d retention)"
+
+trace_hierarchy:
+  root: "Request Trace"
+  spans:
+    - "Validation Span (Zod parse)"
+    - "Parameter Mapping Span (lookup tables)"
+    - "Simulation Span (10K Monte Carlo iterations)"
+    - "Gordon-Loeb Span (optimal spend)"
+    - "Post-Processing Span (drivers, recommendations, rating)"
+    - "Response Span (JSON serialization)"
+
+event_types:
+  - name: "request.start"
+    attributes: ["timestamp", "method", "path"]
+  - name: "request.end"
+    attributes: ["duration_ms", "status_code", "cold_start"]
+  - name: "validation.end"
+    attributes: ["success", "error_count"]
+  - name: "simulation.end"
+    attributes: ["duration_ms", "iterations", "mean_ale", "p95_ale"]
+  - name: "error.validation"
+    attributes: ["issue_count", "first_issue"]
+  - name: "error.simulation"
+    attributes: ["error_type", "message"]
+
+pii_rules:
+  - rule: "Never log user inputs (industry, revenue, controls, threats)"
+  - rule: "Only log computation metadata (timestamps, durations, status codes)"
+  - rule: "ALE output values are safe to log (non-reversible aggregate statistics)"
+  - rule: "LogEntry TypeScript interface enforces field allowlist at compile time"
+  - rule: "No session IDs, no user IDs, no cookies (stateless architecture)"
+
+northstar_instrumentation:
+  metric: "End-to-end completion rate (landing -> assess -> calculate -> results)"
+  funnel_steps:
+    - step: "landing_view"
+      page: "/"
+    - step: "assess_start"
+      page: "/assess"
+    - step: "wizard_step_advance"
+      page: "/assess (per step)"
+    - step: "calculate_click"
+      page: "/assess (step 5)"
+    - step: "results_view"
+      page: "/results"
+
+performance_targets:
+  api_p50_warm: "< 100ms"
+  api_p95_warm: "< 200ms"
+  simulation_p50: "< 60ms"
+  cold_start: "< 3s"
+  error_rate_5xx: "< 0.1%"
+  landing_lcp: "< 1.5s"
+  response_payload: "< 50KB"
+
+alert_thresholds:
+  error_rate_5xx: "> 5% in 15 minutes"
+  latency_p95: "> 5s for 10 minutes"
+  completion_rate: "< 30% in 1 hour"
+  validation_rate_400: "> 25% in 15 minutes"
+
+dashboard_panels:
+  - "North Star Funnel"
+  - "API Performance"
+  - "Simulation Health"
+  - "Error Rates"
+  - "Wizard Engagement"
+
+maturity_phases:
+  - name: "Hackathon MVP"
+    capabilities: ["console.log JSON", "performance.now timing", "response metadata", "Vercel dashboard"]
+  - name: "Post-Hackathon"
+    capabilities: ["Server-Timing headers", "funnel tracking", "Vercel Web Analytics"]
+  - name: "Production"
+    capabilities: ["Log drain", "custom dashboards", "alert rules", "synthetic monitoring"]
+  - name: "Advanced"
+    capabilities: ["OpenTelemetry", "A/B testing", "drift detection"]

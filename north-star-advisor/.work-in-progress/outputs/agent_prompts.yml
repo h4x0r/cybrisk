@@ -1,0 +1,144 @@
+# Component Behavior Specifications - Structured Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/AGENT_PROMPTS.md
+
+document_type: "Component Behavior Specifications"
+modules_count: 8
+
+modules:
+  monte_carlo:
+    file: "src/lib/monte-carlo.ts"
+    purpose: "Run 10,000 FAIR model iterations"
+    input: "FairParams (PERT min/mode/max for TEF, Vuln, PL, SL)"
+    output: "SimulationOutput (ALE percentiles, histogram 50 bins, LEC 20 points, sorted losses)"
+    key_algorithms:
+      - "PERT sampling via Joehnk Beta algorithm"
+      - "Box-Muller transform for log-normal"
+      - "Running mean (Welford's algorithm)"
+      - "Nearest-rank percentile"
+      - "Binary search for LEC computation"
+    performance: "< 100ms for 10K iterations"
+    dependencies: ["types.ts"]
+
+  lookup_tables:
+    file: "src/lib/lookup-tables.ts"
+    purpose: "Map questionnaire answers to PERT parameters"
+    input: "LookupInputs (industry, revenue, records, controls, threats)"
+    output: "FairParams (PERT params for all 4 FAIR factors)"
+    data_sources:
+      - "IBM Cost of a Data Breach 2025"
+      - "Verizon DBIR 2025"
+      - "NetDiligence Cyber Claims Study 2025"
+    key_rules:
+      - "Control modifiers stack additively"
+      - "Vulnerability floor at 0.02 (never zero)"
+      - "Threat type stacking uses max multiplier, not product"
+      - "Per-record cost uses maximum of selected data types"
+    dependencies: ["types.ts"]
+
+  gordon_loeb:
+    file: "src/lib/gordon-loeb.ts"
+    purpose: "Calculate optimal security investment"
+    formula: "Optimal Spend <= (1/e) * v * L = 0.3679 * v * L"
+    input: "SimulationOutput + controls + revenueBand"
+    output: "GordonLoebResult (optimalSpend, currentRisk, residualRisk)"
+    constraints:
+      - "Revenue cap at 5% of revenue midpoint"
+      - "Vulnerability range [0.05, 0.95]"
+    dependencies: ["types.ts"]
+
+  api_route:
+    file: "src/app/api/calculate/route.ts"
+    purpose: "Orchestrate calculation pipeline"
+    runtime: "Node.js 20.x serverless"
+    pipeline:
+      - "Parse JSON body"
+      - "Zod validation"
+      - "Map to FAIR params"
+      - "Run Monte Carlo (10K)"
+      - "Compute Gordon-Loeb"
+      - "Sanity checks"
+      - "Derive risk rating"
+      - "Identify key drivers"
+      - "Generate recommendations"
+      - "Return JSON response"
+    error_codes:
+      - "400: Validation failure"
+      - "405: Wrong HTTP method"
+      - "500: Simulation error"
+    security_rules:
+      - "Destructure only expected fields"
+      - "Hard bounds on numeric inputs"
+      - "Strict enum constraints"
+      - "No dynamic code execution"
+      - "No user data in logs"
+    dependencies: ["validation.ts", "lookup-tables.ts", "monte-carlo.ts", "gordon-loeb.ts", "types.ts"]
+
+  wizard_state:
+    file: "src/app/assess/page.tsx"
+    purpose: "Manage 5-step wizard state"
+    pattern: "Parent useState with step components as children"
+    steps:
+      - "CompanyProfile: industry, revenue, employees"
+      - "DataProfile: data types, records, sensitivity"
+      - "SecurityControls: 10 boolean toggles"
+      - "ThreatLandscape: threats, incidents"
+      - "ReviewCalculate: summary + submit"
+    key_rules:
+      - "State preserved on back/forward navigation"
+      - "Per-step Zod validation"
+      - "No external state library"
+      - "Double-click prevention via isCalculating state"
+    dependencies: ["types.ts", "validation.ts"]
+
+  results_context:
+    file: "src/contexts/results-context.tsx"
+    purpose: "Transfer results from API to results page"
+    pattern: "React Context + sessionStorage backup"
+    key_rules:
+      - "Dual storage: Context (instant) + sessionStorage (refresh-resilient)"
+      - "Clear on new calculation"
+      - "Redirect to /assess if no results"
+      - "Never store rawLosses in sessionStorage"
+    dependencies: ["types.ts"]
+
+  chart_formatter:
+    files:
+      - "src/components/results/loss-distribution.tsx"
+      - "src/components/results/loss-exceedance.tsx"
+      - "src/components/results/chart-container.tsx"
+    purpose: "Render MC output as Recharts visualizations"
+    key_rules:
+      - "Never pass raw 10K array to Recharts"
+      - "isAnimationActive={false}"
+      - "dot={false} on LineChart"
+      - "Brand colors from chart-theme.ts"
+      - "aria-hidden SVG + sr-only data table"
+    dependencies: ["types.ts", "chart-theme.ts"]
+
+  validation:
+    file: "src/lib/validation.ts"
+    purpose: "Single source of truth for Zod schemas"
+    shared_between: ["API route (server)", "Wizard (client)"]
+    key_rules:
+      - "Per-step schemas for client validation"
+      - "Combined schema for server validation"
+      - "Never trust client-side validation"
+      - "Enum types from types.ts as single source"
+    dependencies: ["types.ts"]
+
+cross_module_invariants:
+  - "ALE >= 0"
+  - "ALE <= 10x revenue"
+  - "Vulnerability in [0, 1]"
+  - "No rawLosses in API response"
+  - "Histogram has exactly 50 bins"
+  - "LEC has exactly 20 points"
+  - "Dollar format via formatCompactDollar()"
+  - "Zod schema shared between client and server"
+
+risk_rating_thresholds:
+  LOW: "ALE < 0.5% of revenue"
+  MODERATE: "ALE 0.5% - 2% of revenue"
+  HIGH: "ALE 2% - 5% of revenue"
+  CRITICAL: "ALE > 5% of revenue"

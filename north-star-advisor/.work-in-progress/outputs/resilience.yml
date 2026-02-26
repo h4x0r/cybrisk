@@ -1,0 +1,142 @@
+# CybRisk Resilience Patterns - Cross-Reference Outputs
+# Generated: 2026-02-22
+# Source: north-star-advisor/docs/architecture/RESILIENCE_PATTERNS.md
+
+design_context:
+  architecture_type: "stateless_calculator"
+  external_dependencies: 0
+  circuit_breakers_needed: false
+  database_connections: false
+  resilience_philosophy: "Computation safety + input validation + graceful error responses"
+
+computation_safety:
+  pert_guards:
+    - zero_range_returns_constant: "range <= 0 returns min"
+    - mode_clamped_to_bounds: "clampedMode = max(min, min(max, mode))"
+    - non_finite_fallback_to_mode: "if !Number.isFinite(result) return clampedMode"
+  joehnk_safety:
+    max_iterations: 1000
+    fallback: "expected_value: alpha / (alpha + beta)"
+  vulnerability_clamping:
+    lookup_engine_floor: 0.02
+    lookup_engine_ceiling: 1.0
+    mc_engine_per_sample: "[0, 1]"
+    defense_in_depth: "both modules clamp independently"
+  running_mean:
+    algorithm: "welford_online"
+    avoids: "floating-point overflow from sum-then-divide"
+  nan_infinity_guard:
+    replacement: 0
+    rationale: "loss array must have exactly iterations elements"
+  output_plausibility_cap:
+    ceiling: "10x revenue midpoint"
+    floor: 0
+
+validation_layers:
+  count: 5
+  layers:
+    - name: "Client Zod"
+      level: "data types and field presence"
+      bypassable: true
+    - name: "Server Zod"
+      level: "data types, ranges, and enums"
+      bypassable: false
+      strict_mode: true
+    - name: "Lookup bounds"
+      level: "computed PERT parameter validity"
+    - name: "Per-sample clamp"
+      level: "individual stochastic sample validity"
+    - name: "Output cap"
+      level: "final result plausibility"
+
+fallback_chain:
+  levels:
+    - name: "primary"
+      description: "Monte Carlo simulation (10K iterations, full PERT sampling)"
+      timeout: null
+    - name: "degraded"
+      description: "Deterministic point estimate (mode values only, no distribution)"
+      trigger: "simulation throws or produces all-NaN"
+    - name: "cached"
+      description: "Pre-computed mid-market services company results"
+      trigger: "both simulation and deterministic fail"
+      metadata_signal: "iterations === 0"
+    - name: "client_error_state"
+      description: "Retry + Edit Inputs buttons, no results displayed"
+      trigger: "all server-side computation fails"
+
+timeout_config:
+  vercel_function: "300s (Fluid Compute)"
+  client_fetch: "15s"
+  simulation_loop: "5s (checked every 1000 iterations)"
+  minimum_loading_animation: "1.5s"
+  chart_render_budget: "3s (soft target)"
+
+cold_start_mitigation:
+  loading_animation_phases:
+    - "Analyzing your risk profile..."
+    - "Running 10,000 simulations..."
+    - "Computing financial exposure..."
+  phase_rotation_interval: "2s"
+  retry_message: "This usually resolves on retry (server was warming up)"
+  minimum_animation: "1.5s"
+
+client_resilience:
+  results_navigation_guard:
+    priority_1: "React Context (current navigation)"
+    priority_2: "sessionStorage (page refresh)"
+    priority_3: "Redirect to /assess"
+    redirect_method: "router.replace (not push)"
+  session_storage_safety:
+    write_wrapped: true
+    read_wrapped: true
+    quota_exceeded_handling: "catch and continue without persistence"
+    corrupt_json_handling: "return null, redirect to /assess"
+    raw_losses_excluded: "strip rawLosses before storing (200KB savings)"
+  chart_rendering:
+    empty_histogram_fallback: "Distribution data is not available message"
+    all_zero_counts_fallback: "All simulation iterations produced zero loss message"
+    props_validated_before_render: true
+
+error_recovery:
+  http_400: "Navigate to failing wizard step with inline error"
+  http_500: "Retry button + Edit Inputs button"
+  timeout_504: "Retry button with cold-start explanation"
+  network_error: "Check connection message + Retry button"
+  double_click_prevention: "Button disabled on first click (isCalculating state)"
+
+health_check:
+  endpoint: "GET /api/health"
+  smoke_test_iterations: 100
+  checks:
+    - "ale.mean is finite"
+    - "ale.mean >= 0"
+    - "ale.p5 <= ale.p95"
+  response_statuses:
+    healthy: 200
+    degraded: 503
+    unhealthy: 503
+
+edge_cases:
+  degenerate_distribution:
+    trigger: "all PERT params have zero range"
+    histogram_behavior: "single bin with count = iterations"
+    lec_behavior: "3 points (slightly below, at, slightly above)"
+  zero_loss_iterations:
+    is_valid: true
+    no_warning_needed: true
+    cause: "well-protected company in low-threat industry"
+  bin_division_by_zero:
+    guard: "range < 0.01 check before binWidth computation"
+
+cross_references:
+  architecture_blueprint:
+    - section: "12. Error Handling and Resilience"
+    - section: "9. Security Considerations"
+    - section: "6. Monte Carlo Engine Design"
+  agent_prompts:
+    - module: "Monte Carlo Engine (behavioral rules 1-7)"
+    - module: "Lookup Table Engine (control modifier stacking)"
+    - module: "API Route Handler (output plausibility capping)"
+    - module: "Results Context (dual storage pattern)"
+    - module: "Chart Data Formatter (rendering guards)"
