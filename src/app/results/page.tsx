@@ -8,10 +8,23 @@ import LossDistribution from '@/components/results/LossDistribution';
 import ExceedanceCurve from '@/components/results/ExceedanceCurve';
 import KeyDrivers from '@/components/results/KeyDrivers';
 import Recommendations from '@/components/results/Recommendations';
-import IndustryBenchmark from '@/components/results/IndustryBenchmark';
 import ResultsSurface from '@/components/results/ResultsSurface';
 import { TEF_BY_INDUSTRY } from '@/lib/lookup-tables';
 import { encodeInputs, deriveShareSeed } from '@/lib/share-url';
+import dynamic from 'next/dynamic';
+
+const ThreatOriginMap = dynamic(
+  () => import('@/components/results/ThreatOriginMap'),
+  { ssr: false },
+);
+const IndustryTower = dynamic(
+  () => import('@/components/results/IndustryTower'),
+  { ssr: false },
+);
+const RegulatoryMap = dynamic(
+  () => import('@/components/results/RegulatoryMap'),
+  { ssr: false },
+);
 
 const glassmorphism: React.CSSProperties = {
   background: 'rgba(4, 8, 28, 0.92)',
@@ -170,14 +183,27 @@ function ResultsPage() {
           </div>
         </div>
 
-        {/* Benchmark - full width */}
-        <div style={glassmorphism} className="mt-6">
-          <IndustryBenchmark
-            yourAle={results.industryBenchmark.yourAle}
-            industryMedian={results.industryBenchmark.industryMedian}
-            percentileRank={results.industryBenchmark.percentileRank}
-          />
-        </div>
+        {/* NEW: Threat Origin Map + Industry Tower — 2 columns */}
+        {inputs && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div style={glassmorphism}>
+              <ThreatOriginMap userGeography={inputs.company.geography} />
+            </div>
+            <div style={glassmorphism}>
+              <IndustryTower
+                userIndustry={inputs.company.industry}
+                userAle={results.industryBenchmark.yourAle}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* NEW: Regulatory Choropleth — full width */}
+        {inputs && (
+          <div style={glassmorphism} className="mt-6">
+            <RegulatoryMap userGeography={inputs.company.geography} />
+          </div>
+        )}
 
         {/* Assumptions & Limitations */}
         <details
