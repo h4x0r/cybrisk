@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by IndustryTower in the results page layout.
+ * Kept for reference. Do not import from new code.
+ */
 'use client';
 import React from 'react';
 
