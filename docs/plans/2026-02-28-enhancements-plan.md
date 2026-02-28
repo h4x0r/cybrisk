@@ -4,9 +4,9 @@
 
 **Goal:** Add AI executive narrative, live FX currency localisation, assessment history, email delivery via Resend, and lead capture via Turso.
 
-**Architecture:** TDD for all pure logic (currency utils, history utils — 16 new tests, 196 total). UI components are presentational only (TypeScript + build verification). Server-side DOCX for email uses `Packer.toBuffer()` with text/tables only (no Canvas — browser-only chart rendering stays in `downloadReport()`). Narrative streams from Anthropic API server-side. Turso stores leads. Resend sends email.
+**Architecture:** TDD for all pure logic (currency utils, history utils — 16 new tests, 196 total). UI components are presentational only (TypeScript + build verification). Server-side DOCX for email uses `Packer.toBuffer()` with text/tables only (no Canvas — browser-only chart rendering stays in `downloadReport()`). Narrative streams from Perplexity API server-side (OpenAI-compatible, `sonar-pro` model with live web search). Turso stores leads. Resend sends email.
 
-**Tech Stack:** Vitest, @anthropic-ai/sdk, resend, @libsql/client, Next.js App Router API routes, localStorage, react-simple-maps (already installed).
+**Tech Stack:** Vitest, resend, @libsql/client, Next.js App Router API routes, localStorage, react-simple-maps (already installed). No extra AI SDK — Perplexity is called via native `fetch`.
 
 ---
 
@@ -29,13 +29,13 @@ Expected: **180 passed**. If not, stop and fix before proceeding.
 
 ```bash
 cd /Users/4n6h4x0r/src/cybrisk
-npm install @anthropic-ai/sdk resend @libsql/client
+npm install resend @libsql/client
 ```
 
 **Step 2: Verify**
 
 ```bash
-node -e "require('@anthropic-ai/sdk'); require('resend'); require('@libsql/client'); console.log('ok')"
+node -e "require('resend'); require('@libsql/client'); console.log('ok')"
 ```
 
 Expected: `ok`
@@ -744,19 +744,24 @@ git commit -m "feat(db): add Turso client singleton + insertLead helper"
 **Files:**
 - Create: `src/app/api/narrative/route.ts`
 
+Uses Perplexity API (`sonar-pro` model) via native `fetch`. No extra SDK needed.
+Perplexity's online models search the web for live threat intel, breach stats, and regulatory news — making the narrative more credible than a static prompt.
+
+The Perplexity API is OpenAI-compatible (SSE streaming). We parse the SSE stream server-side and re-emit plain text chunks so the client (`NarrativePanel`) stays unchanged.
+
 **Step 1: Write the route**
 
 ```typescript
-import Anthropic from '@anthropic-ai/sdk';
 import type { AssessmentInputs, SimulationResults } from '@/lib/types';
 import type { Currency } from '@/lib/currency';
 import { CURRENCY_SYMBOLS } from '@/lib/currency';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions';
+const MODEL = 'sonar-pro';
 
-const SYSTEM_PROMPT = `You are a senior cyber risk advisor writing a 3-4 sentence executive summary for a board audience. Be direct and financial. Cite the ALE figure in the user's selected currency, name the primary loss driver, and include one specific regulatory or industry context relevant to their geography and industry. No jargon. No hedging. No bullet points. No em dashes. Write in plain prose.`;
+const SYSTEM_PROMPT = `You are a senior cyber risk advisor writing a 3-4 sentence executive summary for a board audience. Be direct and financial. Cite the ALE figure in the user's selected currency, name the primary loss driver, and include one specific regulatory or industry context relevant to their geography and industry. Where relevant, reference a recent real-world breach or regulatory action to ground the figures. No jargon. No hedging. No bullet points. No em dashes. Plain prose only.`;
 
-// Rate limiting (reuse pattern from /api/calculate)
+// Rate limiting (same pattern as /api/calculate)
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -800,6 +805,21 @@ Simulation results (100,000 Monte Carlo trials):
 Write the executive summary now.`;
 }
 
+/** Parse a single SSE data line and return the text delta, or null if none. */
+function parseSseLine(line: string): string | null {
+  if (!line.startsWith('data: ')) return null;
+  const payload = line.slice(6).trim();
+  if (payload === '[DONE]') return null;
+  try {
+    const json = JSON.parse(payload) as {
+      choices?: Array<{ delta?: { content?: string } }>;
+    };
+    return json.choices?.[0]?.delta?.content ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
   if (!checkRateLimit(ip)) {
@@ -812,22 +832,44 @@ export async function POST(req: Request) {
     currency: Currency;
   };
 
-  const stream = await client.messages.stream({
-    model: 'claude-opus-4-6',
-    max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: buildPrompt(body.inputs, body.results, body.currency) }],
+  const upstream = await fetch(PERPLEXITY_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 256,
+      stream: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user',   content: buildPrompt(body.inputs, body.results, body.currency) },
+      ],
+    }),
   });
 
+  if (!upstream.ok || !upstream.body) {
+    return new Response('Narrative unavailable', { status: 502 });
+  }
+
+  // Parse Perplexity SSE stream → re-emit plain text chunks
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const event of stream) {
-        if (
-          event.type === 'content_block_delta' &&
-          event.delta.type === 'text_delta'
-        ) {
-          controller.enqueue(encoder.encode(event.delta.text));
+      const reader = upstream.body!.getReader();
+      let buffer = '';
+      let done = false;
+      while (!done) {
+        const { value, done: d } = await reader.read();
+        done = d;
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          const text = parseSseLine(line);
+          if (text) controller.enqueue(encoder.encode(text));
         }
       }
       controller.close();
@@ -860,7 +902,7 @@ Expected: **196 passed**
 
 ```bash
 git add src/app/api/narrative/route.ts
-git commit -m "feat(api): add /api/narrative — streaming Claude executive summary"
+git commit -m "feat(api): add /api/narrative — streaming Perplexity sonar-pro executive summary"
 ```
 
 ---
@@ -1196,7 +1238,7 @@ export default function NarrativePanel({ inputs, results, currency }: NarrativeP
           className="text-[10px] mt-3"
           style={{ fontFamily: 'var(--font-geist-mono)', color: '#2a4060' }}
         >
-          Generated by Claude · Anthropic API
+          Generated by Perplexity sonar-pro
         </p>
       )}
     </div>
