@@ -4,8 +4,6 @@ import type { Currency } from '@/lib/currency';
 const HISTORY_KEY = 'cybrisk_history';
 const MAX_ENTRIES = 20;
 const DEDUP_WINDOW_MS = 24 * 60 * 60 * 1_000; // 24 hours
-// Only deduplicate entries with plausible timestamps (after year 2000)
-const MIN_VALID_TIMESTAMP_MS = new Date('2000-01-01T00:00:00Z').getTime();
 
 export interface HistoryEntry {
   id: string;
@@ -47,15 +45,9 @@ export function saveToHistory(entry: HistoryEntry, storage: StorageLike = browse
   const entryTime = new Date(entry.savedAt).getTime();
   const inputsStr = JSON.stringify(entry.inputs);
 
-  const isDuplicate = entryTime > MIN_VALID_TIMESTAMP_MS && existing.some(e => {
-    const existingTime = new Date(e.savedAt).getTime();
-    const timeDiff = Math.abs(existingTime - entryTime);
-    return (
-      existingTime > MIN_VALID_TIMESTAMP_MS &&
-      timeDiff > 0 &&
-      timeDiff < DEDUP_WINDOW_MS &&
-      JSON.stringify(e.inputs) === inputsStr
-    );
+  const isDuplicate = existing.some(e => {
+    const timeDiff = Math.abs(new Date(e.savedAt).getTime() - entryTime);
+    return timeDiff < DEDUP_WINDOW_MS && JSON.stringify(e.inputs) === inputsStr;
   });
 
   if (isDuplicate) return;

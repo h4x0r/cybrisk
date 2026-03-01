@@ -58,8 +58,13 @@ describe('history utils', () => {
 
     it('caps history at 20 entries', () => {
       const store = makeStore();
+      const base = new Date('2026-01-01T00:00:00Z').getTime();
       for (let i = 0; i < 21; i++) {
-        saveToHistory({ ...ENTRY, id: `entry-${i}`, savedAt: new Date(i * 1000).toISOString() }, store);
+        saveToHistory({
+          ...ENTRY,
+          id: `entry-${i}`,
+          savedAt: new Date(base + i * 25 * 60 * 60 * 1_000).toISOString(), // 25h apart — avoids dedup window
+        }, store);
       }
       expect(loadHistory(store)).toHaveLength(20);
     });
@@ -70,6 +75,13 @@ describe('history utils', () => {
       saveToHistory({ ...ENTRY, savedAt: base.toISOString() }, store);
       // Same inputs, 1 hour later — should be skipped
       saveToHistory({ ...ENTRY, id: 'test-2', savedAt: new Date(base.getTime() + 3_600_000).toISOString() }, store);
+      expect(loadHistory(store)).toHaveLength(1);
+    });
+
+    it('deduplicates identical inputs at the same timestamp', () => {
+      const store = makeStore();
+      saveToHistory(ENTRY, store);
+      saveToHistory({ ...ENTRY, id: 'test-dup' }, store);
       expect(loadHistory(store)).toHaveLength(1);
     });
 
@@ -93,8 +105,16 @@ describe('history utils', () => {
 
     it('leaves other entries intact', () => {
       const store = makeStore();
+      const entryB = {
+        ...ENTRY,
+        id: 'test-2',
+        inputs: {
+          ...ENTRY.inputs,
+          company: { ...ENTRY.inputs.company, industry: 'Healthcare' },
+        } as HistoryEntry['inputs'],
+      };
       saveToHistory(ENTRY, store);
-      saveToHistory({ ...ENTRY, id: 'test-2' }, store);
+      saveToHistory(entryB, store);
       deleteFromHistory('test-1', store);
       const history = loadHistory(store);
       expect(history).toHaveLength(1);
