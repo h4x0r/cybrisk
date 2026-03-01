@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 
 // ---------------------------------------------------------------------------
 // ResultsSurface — Calibrated 3D loss-exceedance surface
@@ -23,6 +23,7 @@ interface ResultsSurfaceProps {
 
 const COLS = 50;
 const ROWS = 30;
+const LOG_SIG = 1.2; // log-normal shape — module-level constant, not derived from props
 
 // ── Math ────────────────────────────────────────────────────────
 
@@ -112,7 +113,6 @@ export default function ResultsSurface({
   const MIN_TEF = Math.max(0.05, tefMin);
   const MAX_TEF = Math.max(tefMax, tefMode * 2);
   const LOG_MU = Math.log(Math.max(aleMean * 0.4, 50000));
-  const LOG_SIG = 1.2;
 
   // Reference lines using actual values
   const refLines = [
@@ -120,6 +120,24 @@ export default function ResultsSurface({
     { loss: aleMean, color: '#06b6d4', label: 'ALE' },
     { loss: pml95, color: '#ef4444', label: 'PML\u2089\u2085' },
   ];
+
+  // ── Memoized static exceedance mesh ─────────────────────────
+  // The mesh values (normSF × tef) are expensive nested-loop computations
+  // that depend only on the calibrated axis parameters. Memoize them so
+  // re-renders caused by parent state changes don't recompute COLS×ROWS
+  // normSF calls — only the cheap per-frame wave perturbation runs in RAF.
+  const staticMesh = useMemo(() => {
+    const mesh = new Float64Array(COLS * ROWS);
+    for (let row = 0; row < ROWS; row++) {
+      const tef = MIN_TEF + (row / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
+      for (let col = 0; col < COLS; col++) {
+        const loss = Math.max(1, (col / (COLS - 1)) * MAX_LOSS);
+        const z = (Math.log(loss) - LOG_MU) / LOG_SIG;
+        mesh[row * COLS + col] = normSF(z) * tef;
+      }
+    }
+    return mesh;
+  }, [MAX_LOSS, MIN_TEF, MAX_TEF, LOG_MU]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -153,21 +171,16 @@ export default function ResultsSurface({
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
+    // surfaceZ now uses the memoized static base + cheap animated wave
     function surfaceZ(col: number, row: number, t: number): number {
-      const loss = Math.max(1, (col / (COLS - 1)) * MAX_LOSS);
-      const tef = MIN_TEF + (row / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
-      const z = (Math.log(loss) - LOG_MU) / LOG_SIG;
-      const exc = normSF(z);
+      const base = staticMesh[row * COLS + col];
       const wave =
         0.015 * Math.sin(col * 0.25 - t * 0.3) * Math.cos(row * 0.2 + t * 0.2);
-      return tef * exc + wave;
+      return base + wave;
     }
 
     function trueExceedance(col: number, row: number): number {
-      const loss = Math.max(1, (col / (COLS - 1)) * MAX_LOSS);
-      const tef = MIN_TEF + (row / (ROWS - 1)) * (MAX_TEF - MIN_TEF);
-      const z = (Math.log(loss) - LOG_MU) / LOG_SIG;
-      return normSF(z) * tef;
+      return staticMesh[row * COLS + col];
     }
 
     const draw = (now: number) => {
@@ -466,7 +479,7 @@ export default function ResultsSurface({
       canvas.removeEventListener('mouseleave', onMouseLeave);
       ro.disconnect();
     };
-  }, [aleMean, pml95, gordonLoeb, tefMin, tefMode, tefMax, MAX_LOSS, MIN_TEF, MAX_TEF, LOG_MU, refLines]);
+  }, [staticMesh, aleMean, pml95, gordonLoeb, MAX_LOSS, MIN_TEF, MAX_TEF, refLines]);
 
   return (
     <div>

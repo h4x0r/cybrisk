@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AssessmentInputs } from '@/lib/types';
 import { compareScenarios, type ScenarioComparison } from '@/lib/scenario-compare';
+import { applyCloudOverride } from '@/lib/compare-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,6 +62,7 @@ export default function CompareShell() {
   const router = useRouter();
   const [base, setBase] = useState<AssessmentInputs | null>(null);
   const [controls, setControls] = useState<AssessmentInputs['controls'] | null>(null);
+  const [cloudPct, setCloudPct] = useState<number | null>(null);
   const [comparison, setComparison] = useState<ScenarioComparison | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -84,17 +86,21 @@ export default function CompareShell() {
   const runComparison = useCallback(() => {
     if (!base || !controls) return;
     setRunning(true);
-    const modified: AssessmentInputs = { ...base, controls };
+    const modifiedInputs: AssessmentInputs = { ...base, controls };
+    const modifiedWithCloud = cloudPct !== null
+      ? applyCloudOverride(modifiedInputs, cloudPct)
+      : modifiedInputs;
     setTimeout(() => {
-      const result = compareScenarios(base, modified, 100_000);
+      const result = compareScenarios(base, modifiedWithCloud, 100_000);
       setComparison(result);
       setRunning(false);
     }, 50);
-  }, [base, controls]);
+  }, [base, controls, cloudPct]);
 
   if (!base || !controls) return null;
 
-  const noChanges = JSON.stringify(controls) === JSON.stringify(base.controls);
+  const cloudChanged = cloudPct !== null && cloudPct !== base.data.cloudPercentage;
+  const noChanges = JSON.stringify(controls) === JSON.stringify(base.controls) && !cloudChanged;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -189,6 +195,32 @@ export default function CompareShell() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Cloud % Slider */}
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(0,180,255,0.08)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs" style={{ fontFamily: 'var(--font-geist-mono)', color: '#6888aa' }}>
+                CLOUD EXPOSURE
+              </span>
+              <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-geist-mono)', color: '#00d4ff' }}>
+                {cloudPct ?? base.data.cloudPercentage}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={cloudPct ?? base.data.cloudPercentage}
+              onChange={(e) => { setCloudPct(Number(e.target.value)); setComparison(null); }}
+              className="w-full accent-cyan-500"
+            />
+            <div className="flex justify-between text-[10px] mt-1" style={{ color: '#4a6080' }}>
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
           </div>
 
           <button
