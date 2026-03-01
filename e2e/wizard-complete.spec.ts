@@ -76,7 +76,7 @@ test.describe('Wizard Complete Flow', () => {
     // Verify review shows our selections
     await expect(page.getByText('Financial')).toBeVisible();
     await expect(page.getByText('Customer PII')).toBeVisible();
-    await expect(page.getByText('Ready to run 10,000 Monte Carlo simulations')).toBeVisible();
+    await expect(page.getByText('Ready to run 100,000 Monte Carlo simulations')).toBeVisible();
 
     // Click RUN SIMULATION
     await page.getByRole('button', { name: /RUN SIMULATION/i }).click();

@@ -81,12 +81,11 @@ test.describe('Full Assessment Flow', () => {
     // Check recommendations section renders
     await expect(page.getByText('RECOMMENDATIONS')).toBeVisible();
 
-    // Check industry benchmark section renders
-    await expect(page.getByText('INDUSTRY BENCHMARK')).toBeVisible();
+    // Check risk drivers section renders (always present with results, no inputs needed)
+    await expect(page.getByText('KEY RISK DRIVERS')).toBeVisible();
 
     // Check navigation buttons
     await expect(page.getByText('New Assessment')).toBeVisible();
-    await expect(page.getByText('Home')).toBeVisible();
   });
 
   test('results page "New Assessment" navigates to /assess', async ({ page }) => {
@@ -119,7 +118,7 @@ test.describe('Full Assessment Flow', () => {
     await expect(page).toHaveURL('/assess');
   });
 
-  test('results page "Home" navigates to /', async ({ page }) => {
+  test('results page "What If?" link navigates to /compare', async ({ page }) => {
     await page.goto('/');
 
     const mockResults = {
@@ -136,16 +135,24 @@ test.describe('Full Assessment Flow', () => {
       rawLosses: [],
     };
 
-    await page.evaluate((data) => {
-      sessionStorage.setItem('results', JSON.stringify(data));
-    }, mockResults);
+    const mockInputs = {
+      company: { industry: 'financial', revenueBand: '50m_250m', employees: '250_1000', geography: 'us' },
+      data: { dataTypes: ['customer_pii'], recordCount: 100000, cloudPercentage: 50 },
+      controls: { securityTeam: true, irPlan: true, aiAutomation: false, mfa: true, pentest: false, cyberInsurance: false },
+      threats: { topConcerns: ['ransomware'], previousIncidents: '0' },
+    };
+
+    await page.evaluate(({ results, inputs }) => {
+      sessionStorage.setItem('results', JSON.stringify(results));
+      sessionStorage.setItem('assessment', JSON.stringify(inputs));
+    }, { results: mockResults, inputs: mockInputs });
 
     await page.goto('/results');
     await page.waitForTimeout(1000);
 
-    // Click "Home"
-    await page.getByText('Home').click();
-    await expect(page).toHaveURL('/');
+    // Click "What If? →" link (requires inputs to be loaded)
+    await page.getByText('What If? →').click();
+    await expect(page).toHaveURL('/compare');
   });
 
   test('simulate page runs Monte Carlo with injected assessment', async ({ page }) => {
@@ -165,10 +172,11 @@ test.describe('Full Assessment Flow', () => {
     await page.goto('/simulate');
 
     // Should show simulation console with terminal-style output
-    await expect(page.getByText(/Loading actuarial/i).first()).toBeVisible({ timeout: 5000 });
+    // Text is "LOADING {INDUSTRY} ACTUARIAL PARAMS..." — match on the stable suffix
+    await expect(page.getByText(/ACTUARIAL PARAMS/i).first()).toBeVisible({ timeout: 5000 });
 
     // Should show the terminal title bar
-    await expect(page.getByText(/monte carlo engine/i)).toBeVisible();
+    await expect(page.getByText(/FAIR RISK ENGINE/i)).toBeVisible();
 
     // Wait for simulation to complete and navigate to results
     await page.waitForURL('/results', { timeout: 20000 });
@@ -178,6 +186,6 @@ test.describe('Full Assessment Flow', () => {
     await expect(page.getByText('ALE', { exact: true })).toBeVisible();
     await expect(page.getByText('KEY RISK DRIVERS')).toBeVisible();
     await expect(page.getByText('RECOMMENDATIONS')).toBeVisible();
-    await expect(page.getByText('INDUSTRY BENCHMARK')).toBeVisible();
+    await expect(page.getByText('Model Assumptions')).toBeVisible();
   });
 });

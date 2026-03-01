@@ -28,11 +28,11 @@ test.describe('Landing Page', () => {
 
   test('has trust strip with methodology badges', async ({ page }) => {
     await page.goto('/');
-    // Trust strip contains these values from TRUST_STATS
-    await expect(page.getByText('MC Simulations')).toBeVisible();
+    // Trust strip TRUST_STATS values (updated after landing page refactor)
+    await expect(page.getByText('Monte Carlo Trials', { exact: true })).toBeVisible();
     await expect(page.getByText('IBM 2024', { exact: true })).toBeVisible();
-    await expect(page.getByText('Optimal Spend Model')).toBeVisible();
-    await expect(page.getByText('Risk Framework')).toBeVisible();
+    await expect(page.getByText('Verizon DBIR', { exact: true })).toBeVisible();
+    await expect(page.getByText('NetDiligence', { exact: true })).toBeVisible();
   });
 
   test('renders the hero chart card with ALE figure', async ({ page }) => {
