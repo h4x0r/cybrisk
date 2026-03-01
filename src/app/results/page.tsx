@@ -91,7 +91,7 @@ function ResultsPage() {
             saveToHistory({
               id: crypto.randomUUID(),
               savedAt: new Date().toISOString(),
-              label: `${decoded.company.industry} · ${decoded.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
+              label: `${decoded.company.organizationName ? decoded.company.organizationName + ' · ' : ''}${decoded.company.industry} · ${decoded.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
               inputs: decoded,
               results: simResults,
               currency,
@@ -121,7 +121,7 @@ function ResultsPage() {
           saveToHistory({
             id: crypto.randomUUID(),
             savedAt: new Date().toISOString(),
-            label: `${parsedInputs.company.industry} · ${parsedInputs.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
+            label: `${parsedInputs.company.organizationName ? parsedInputs.company.organizationName + ' · ' : ''}${parsedInputs.company.industry} · ${parsedInputs.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
             inputs: parsedInputs,
             results: parsed,
             currency,
@@ -180,6 +180,16 @@ function ResultsPage() {
       <LorenzCanvas riskRating={results.riskRating} ale={results.ale.mean} />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
+        {/* Org name header */}
+        {inputs?.company.organizationName && (
+          <p
+            className="text-xs mb-2 tracking-widest uppercase"
+            style={{ fontFamily: 'var(--font-geist-mono)', color: '#4a6080' }}
+          >
+            {inputs.company.organizationName}
+          </p>
+        )}
+
         {/* Ticker Bar with Currency Selector */}
         <div className="flex items-center gap-3">
           <div className="flex-1">

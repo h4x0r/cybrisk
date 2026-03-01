@@ -30,7 +30,7 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-function buildPrompt(
+export function buildPrompt(
   inputs: AssessmentInputs,
   results: SimulationResults,
   currency: Currency,
@@ -40,8 +40,12 @@ function buildPrompt(
   const aleP95  = (results.ale.p95  / 1_000_000).toFixed(2);
   const glSpend = (results.gordonLoebSpend / 1_000).toFixed(0);
 
+  const orgLine = inputs.company.organizationName
+    ? `- Organization: ${inputs.company.organizationName}\n`
+    : '';
+
   return `Organisation profile:
-- Industry: ${inputs.company.industry}
+${orgLine}- Industry: ${inputs.company.industry}
 - Geography: ${inputs.company.geography}
 - Revenue band: ${inputs.company.revenueBand}
 - Controls: MFA=${inputs.controls.mfa}, SecurityTeam=${inputs.controls.securityTeam}, IRPlan=${inputs.controls.irPlan}
