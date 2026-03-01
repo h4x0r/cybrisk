@@ -18,7 +18,7 @@ import { NarrativePanel } from '@/components/results/NarrativePanel';
 import { EmailModal } from '@/components/results/EmailModal';
 import { saveToHistory } from '@/lib/history-utils';
 import { formatCurrency } from '@/lib/currency';
-
+import { generateCSV } from '@/lib/csv-export';
 const ThreatOriginMap = dynamic(
   () => import('@/components/results/ThreatOriginMap'),
   { ssr: false },
@@ -156,6 +156,19 @@ function ResultsPage() {
     }
   }, [results, inputs]);
 
+  const handleExportCSV = useCallback(() => {
+    if (!results || !inputs) return;
+    const csv = generateCSV(inputs, results);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cybrisk-${inputs.company.organizationName ?? inputs.company.industry}-${inputs.company.geography}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [results, inputs]);
   if (!results) {
     return (
       <main
@@ -347,6 +360,20 @@ function ResultsPage() {
               }}
             >
               {exporting ? 'Generating...' : 'Export Report (.docx)'}
+            </button>
+          )}
+          {inputs && (
+            <button
+              onClick={handleExportCSV}
+              className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
+              style={{
+                fontFamily: 'var(--font-geist-mono)',
+                background: 'rgba(168,85,247,0.08)',
+                border: '1px solid rgba(168,85,247,0.3)',
+                color: '#a855f7',
+              }}
+            >
+              Export CSV
             </button>
           )}
           {inputs && (
