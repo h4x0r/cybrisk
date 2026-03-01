@@ -5,7 +5,11 @@ import { FALLBACK_RATES } from '@/lib/currency';
 import type { AssessmentInputs, SimulationResults } from '@/lib/types';
 import type { Currency } from '@/lib/currency';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialized inside the handler — module-level construction throws at build time
+// when RESEND_API_KEY is not present in the build environment.
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -44,7 +48,7 @@ export async function POST(req: Request) {
 
   // 2. Send email via Resend
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: 'CybRisk <reports@cybrisk.ai>',
       to: body.email,
       bcc: process.env.REPORT_RECIPIENT_EMAIL ?? undefined,
