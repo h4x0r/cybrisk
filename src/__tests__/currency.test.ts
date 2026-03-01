@@ -32,6 +32,10 @@ describe('currency utils', () => {
       expect(parseYahooFxResponse({ foo: 'bar' })).toEqual(FALLBACK_RATES);
     });
 
+    it('returns FALLBACK_RATES for empty result array', () => {
+      expect(parseYahooFxResponse({ quoteResponse: { result: [] } })).toEqual(FALLBACK_RATES);
+    });
+
     it('parses a valid Yahoo Finance v7 quote response', () => {
       const fixture = {
         quoteResponse: {
@@ -66,6 +70,10 @@ describe('currency utils', () => {
     it('formats HKD with HK$ symbol', () => {
       const result = formatCurrency(2_400_000, 'HKD', TEST_RATES);
       expect(result.startsWith('HK$')).toBe(true);
+    });
+
+    it('formats sub-million values with K suffix', () => {
+      expect(formatCurrency(500_000, 'USD', TEST_RATES)).toBe('$500.0K');
     });
   });
 });
