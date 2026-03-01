@@ -48,6 +48,7 @@ import {
   REVENUE_MIDPOINTS,
   EMPLOYEE_MULTIPLIERS,
 } from '@/lib/lookup-tables';
+import { type Currency, formatCurrency } from '@/lib/currency';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -2329,4 +2330,170 @@ export async function downloadReport(
   const filename = `cybrisk-${orgSlug}-${inputs.company.industry}-risk-assessment-${dateSlug}.docx`;
 
   saveAs(blob, filename);
+}
+
+// ---------------------------------------------------------------------------
+// Server-safe report buffer — no Canvas, no browser APIs
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a simple two-column TableRow for a metric label/value pair.
+ * Used by generateReportBuffer (server-safe, no Canvas dependency).
+ */
+function makeMetricRow(label: string, value: string): TableRow {
+  return new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph({ text: label })],
+        width: { size: 50, type: WidthType.PERCENTAGE },
+        borders: CELL_BORDER,
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: value })],
+        width: { size: 50, type: WidthType.PERCENTAGE },
+        borders: CELL_BORDER,
+      }),
+    ],
+  });
+}
+
+/**
+ * Generate a DOCX report as a Node.js Buffer suitable for email attachment.
+ *
+ * This function is intentionally server-safe:
+ * - No Canvas / DOM APIs (no chart images)
+ * - No file-saver / browser globals
+ * - Returns Buffer via Packer.toBuffer()
+ *
+ * Called by /api/send-report to attach the report to an email.
+ */
+export async function generateReportBuffer(
+  inputs: AssessmentInputs,
+  results: SimulationResults,
+  currency: Currency,
+  rates: Record<Currency, number>,
+  narrative?: string,
+): Promise<Buffer> {
+  const orgName = inputs.company.organizationName?.trim() || 'Acme Corp';
+  const industry = INDUSTRY_NAMES[inputs.company.industry];
+  const dateStr = new Date().toLocaleDateString('en-GB');
+
+  const children: (Paragraph | Table)[] = [
+    // Title block
+    new Paragraph({
+      text: 'CybRisk Assessment Report',
+      heading: HeadingLevel.HEADING_1,
+    }),
+    new Paragraph({
+      text: `${orgName} · ${industry} · ${inputs.company.geography.toUpperCase()} · ${dateStr}`,
+    }),
+    new Paragraph({ spacing: { after: 200 } }),
+
+    // AI narrative (if provided)
+    ...(narrative
+      ? [
+          new Paragraph({ text: 'Executive Summary', heading: HeadingLevel.HEADING_2 }),
+          new Paragraph({ text: narrative, spacing: { after: 200 } }),
+        ]
+      : []),
+
+    // Key metrics section
+    new Paragraph({ text: 'Key Metrics', heading: HeadingLevel.HEADING_2 }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        makeMetricRow(
+          'Annual Loss Expectancy (Mean)',
+          formatCurrency(results.ale.mean, currency, rates),
+        ),
+        makeMetricRow(
+          '95th Percentile Tail Risk (PML)',
+          formatCurrency(results.ale.p95, currency, rates),
+        ),
+        makeMetricRow(
+          'Median Loss',
+          formatCurrency(results.ale.median, currency, rates),
+        ),
+        makeMetricRow(
+          'Gordon-Loeb Optimal Security Spend',
+          formatCurrency(results.gordonLoebSpend, currency, rates),
+        ),
+        makeMetricRow('Risk Rating', results.riskRating),
+        makeMetricRow(
+          'Industry Benchmark (Median ALE)',
+          formatCurrency(results.industryBenchmark.industryMedian, currency, rates),
+        ),
+        makeMetricRow(
+          'Your Percentile Rank in Industry',
+          `${results.industryBenchmark.percentileRank}th percentile`,
+        ),
+      ],
+    }),
+    new Paragraph({ spacing: { after: 200 } }),
+
+    // Key risk drivers
+    new Paragraph({ text: 'Key Risk Drivers', heading: HeadingLevel.HEADING_2 }),
+    ...results.keyDrivers.map(
+      (d) =>
+        new Paragraph({
+          text: `${d.factor} (${d.impact}): ${d.description}`,
+          bullet: { level: 0 },
+        }),
+    ),
+    new Paragraph({ spacing: { after: 200 } }),
+
+    // Recommendations
+    new Paragraph({ text: 'Recommendations', heading: HeadingLevel.HEADING_2 }),
+    ...results.recommendations.map(
+      (r) =>
+        new Paragraph({
+          text: r,
+          bullet: { level: 0 },
+        }),
+    ),
+    new Paragraph({ spacing: { after: 200 } }),
+
+    // Disclaimer
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Disclaimer: ',
+          bold: true,
+          size: 18,
+          color: '999999',
+          font: 'Calibri',
+        }),
+        new TextRun({
+          text: 'This report is generated using publicly available actuarial data and statistical modelling. It does not constitute professional risk advisory, insurance, legal, or financial advice. Actual losses may differ materially from modelled estimates. Consult qualified professionals for binding decisions.',
+          size: 18,
+          color: '999999',
+          font: 'Calibri',
+          italics: true,
+        }),
+      ],
+    }),
+  ];
+
+  const doc = new Document({
+    creator: 'CybRisk',
+    title: `Cyber Risk Assessment - ${orgName}`,
+    description: `FAIR-based quantitative cyber risk assessment for ${orgName}`,
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: convertInchesToTwip(1),
+              right: convertInchesToTwip(1),
+              bottom: convertInchesToTwip(1),
+              left: convertInchesToTwip(1),
+            },
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  return Buffer.from(await Packer.toBuffer(doc));
 }
