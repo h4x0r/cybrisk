@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   saveToHistory,
   loadHistory,
@@ -19,13 +19,24 @@ const makeStore = () => {
 const ENTRY: HistoryEntry = {
   id: 'test-1',
   savedAt: new Date('2026-01-01T00:00:00Z').toISOString(),
-  label: 'Finance · USA · 2026-01-01',
+  label: 'financial · us · 2026-01-01',
   inputs: {
-    company: { industry: 'Finance', geography: 'USA', revenue: '$100M-$500M' },
-    controls: { mfa: true, edr: true, soc: false, encryption: true, patchCadence: 'monthly', backups: true },
-    threats: { insiderThreat: false, nationState: false, publicFacing: true, thirdPartyRisk: false },
-  } as HistoryEntry['inputs'],
-  results: { ale: { mean: 2_000_000, p95: 5_000_000 }, riskRating: 'High', gordonLoebSpend: 400_000, keyDrivers: [] } as HistoryEntry['results'],
+    company: { industry: 'financial', geography: 'us', revenueBand: '50m_250m', employees: '1000_5000' },
+    data: { dataTypes: ['customer_pii'], recordCount: 50_000, cloudPercentage: 40 },
+    controls: { securityTeam: true, irPlan: false, aiAutomation: false, mfa: true, pentest: false, cyberInsurance: false },
+    threats: { topConcerns: ['ransomware'], previousIncidents: '0' },
+  },
+  results: {
+    ale: { mean: 2_000_000, median: 1_500_000, p10: 500_000, p90: 4_000_000, p95: 5_000_000 },
+    gordonLoebSpend: 400_000,
+    riskRating: 'HIGH',
+    industryBenchmark: { yourAle: 2_000_000, industryMedian: 1_800_000, percentileRank: 60 },
+    distributionBuckets: [],
+    exceedanceCurve: [],
+    keyDrivers: [],
+    recommendations: [],
+    rawLosses: [],
+  },
   currency: 'USD',
 };
 
@@ -117,7 +128,7 @@ describe('history utils', () => {
         id: 'test-2',
         inputs: {
           ...ENTRY.inputs,
-          company: { ...ENTRY.inputs.company, industry: 'Healthcare' },
+          company: { ...ENTRY.inputs.company, industry: 'healthcare' },
         } as HistoryEntry['inputs'],
       };
       saveToHistory(ENTRY, store);
