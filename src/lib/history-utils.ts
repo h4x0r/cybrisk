@@ -1,0 +1,72 @@
+import type { AssessmentInputs, SimulationResults } from '@/lib/types';
+import type { Currency } from '@/lib/currency';
+
+const HISTORY_KEY = 'cybrisk_history';
+const MAX_ENTRIES = 20;
+const DEDUP_WINDOW_MS = 24 * 60 * 60 * 1_000; // 24 hours
+// Only deduplicate entries with plausible timestamps (after year 2000)
+const MIN_VALID_TIMESTAMP_MS = new Date('2000-01-01T00:00:00Z').getTime();
+
+export interface HistoryEntry {
+  id: string;
+  savedAt: string;       // ISO 8601
+  label: string;         // "{industry} · {geography} · {date}"
+  inputs: AssessmentInputs;
+  results: SimulationResults;
+  currency: Currency;
+}
+
+/** Minimal injectable storage interface (real: localStorage, test: in-memory). */
+export interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+const browserStorage: StorageLike = typeof window !== 'undefined'
+  ? window.localStorage
+  : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+
+/** Load history from storage, sorted newest-first. */
+export function loadHistory(storage: StorageLike = browserStorage): HistoryEntry[] {
+  try {
+    const raw = storage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const entries = JSON.parse(raw) as HistoryEntry[];
+    return entries.sort((a, b) =>
+      new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Save a new entry, deduplicating identical inputs within DEDUP_WINDOW_MS. Caps at MAX_ENTRIES. */
+export function saveToHistory(entry: HistoryEntry, storage: StorageLike = browserStorage): void {
+  const existing = loadHistory(storage);
+  const entryTime = new Date(entry.savedAt).getTime();
+  const inputsStr = JSON.stringify(entry.inputs);
+
+  const isDuplicate = entryTime > MIN_VALID_TIMESTAMP_MS && existing.some(e => {
+    const existingTime = new Date(e.savedAt).getTime();
+    const timeDiff = Math.abs(existingTime - entryTime);
+    return (
+      existingTime > MIN_VALID_TIMESTAMP_MS &&
+      timeDiff > 0 &&
+      timeDiff < DEDUP_WINDOW_MS &&
+      JSON.stringify(e.inputs) === inputsStr
+    );
+  });
+
+  if (isDuplicate) return;
+
+  const updated = [entry, ...existing].slice(0, MAX_ENTRIES);
+  storage.setItem(HISTORY_KEY, JSON.stringify(updated));
+}
+
+/** Remove the entry with the given id. */
+export function deleteFromHistory(id: string, storage: StorageLike = browserStorage): void {
+  const existing = loadHistory(storage);
+  const updated = existing.filter(e => e.id !== id);
+  storage.setItem(HISTORY_KEY, JSON.stringify(updated));
+}
