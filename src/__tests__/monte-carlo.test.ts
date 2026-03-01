@@ -386,3 +386,32 @@ describe('sampleTEF threat multiplier', () => {
     expect(sampleTEF(noThreats, rng)).toBeGreaterThan(0);
   });
 });
+
+describe('samplePrimaryLoss cloud modifier', () => {
+  const mkInputs = (cloudPct: number): AssessmentInputs => ({
+    company: { industry: 'financial', revenueBand: '50m_250m', employees: '250_1000', geography: 'us' },
+    data: { dataTypes: ['customer_pii'], recordCount: 100_000, cloudPercentage: cloudPct },
+    controls: { securityTeam: false, irPlan: false, aiAutomation: false, mfa: false, pentest: false, cyberInsurance: false },
+    threats: { topConcerns: ['ransomware'], previousIncidents: '0' },
+  });
+
+  it('100% cloud produces higher mean primary loss than 0% cloud', () => {
+    const seededRng = (seed: number) => {
+      let s = seed; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+    };
+    let highSum = 0, lowSum = 0;
+    const N = 500;
+    for (let i = 0; i < N; i++) {
+      highSum += samplePrimaryLoss(mkInputs(100), seededRng(i));
+      lowSum  += samplePrimaryLoss(mkInputs(0),   seededRng(i));
+    }
+    expect(highSum / N).toBeGreaterThan(lowSum / N);
+  });
+
+  it('cloud modifier is at most 1.12× (IBM 2025 bound)', () => {
+    const rng = () => 0.5;
+    const high = samplePrimaryLoss(mkInputs(100), rng);
+    const zero = samplePrimaryLoss(mkInputs(0),   rng);
+    expect(high / zero).toBeLessThanOrEqual(1.13); // 12% max + small float tolerance
+  });
+});

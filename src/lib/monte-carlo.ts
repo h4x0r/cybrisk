@@ -246,7 +246,11 @@ export function samplePrimaryLoss(
   // Primary loss = per_record_cost x sampled_records
   let primaryLoss = avgCost * sampledRecords;
 
-  // Cap at 10% of revenue
+  // Cloud modifier: IBM 2025 shows cloud-involved breaches cost up to 12% more
+  const cloudModifier = 1 + (inputs.data.cloudPercentage / 100) * 0.12;
+  primaryLoss *= cloudModifier;
+
+  // Cap at 10% of revenue (applied after cloud modifier so cap remains a hard ceiling)
   const revenue = REVENUE_MIDPOINTS[inputs.company.revenueBand];
   primaryLoss = Math.min(primaryLoss, revenue * 0.1);
 
