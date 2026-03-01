@@ -14,6 +14,12 @@ const rateMap = new Map<string, { count: number; resetAt: number }>();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Clean up stale entries to prevent unbounded map growth
+  for (const [key, val] of rateMap) {
+    if (now > val.resetAt) rateMap.delete(key);
+  }
+
   const entry = rateMap.get(ip);
   if (!entry || now > entry.resetAt) {
     rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
