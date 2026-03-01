@@ -69,6 +69,7 @@ export function formatCurrency(
   currency: Currency,
   rates: Record<Currency, number>,
 ): string {
+  if (!isFinite(usd)) return `${CURRENCY_SYMBOLS[currency]}—`;
   const sym = CURRENCY_SYMBOLS[currency];
   const converted = convertAmount(usd, currency, rates);
   if (converted >= 1_000_000) {

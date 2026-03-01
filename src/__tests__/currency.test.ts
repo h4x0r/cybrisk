@@ -75,5 +75,14 @@ describe('currency utils', () => {
     it('formats sub-million values with K suffix', () => {
       expect(formatCurrency(500_000, 'USD', TEST_RATES)).toBe('$500.0K');
     });
+
+    it('returns em-dash for non-finite input', () => {
+      expect(formatCurrency(NaN, 'USD', TEST_RATES)).toBe('$—');
+      expect(formatCurrency(Infinity, 'USD', TEST_RATES)).toBe('$—');
+    });
+
+    it('formats zero correctly', () => {
+      expect(formatCurrency(0, 'USD', TEST_RATES)).toBe('$0');
+    });
   });
 });
