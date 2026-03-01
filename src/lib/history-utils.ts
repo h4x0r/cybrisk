@@ -59,6 +59,7 @@ export function saveToHistory(entry: HistoryEntry, storage: StorageLike = browse
 /** Remove the entry with the given id. */
 export function deleteFromHistory(id: string, storage: StorageLike = browserStorage): void {
   const existing = loadHistory(storage);
+  if (!existing.some(e => e.id === id)) return;
   const updated = existing.filter(e => e.id !== id);
   storage.setItem(HISTORY_KEY, JSON.stringify(updated));
 }

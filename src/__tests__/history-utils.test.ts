@@ -103,6 +103,13 @@ describe('history utils', () => {
       expect(loadHistory(store)).toHaveLength(0);
     });
 
+    it('does nothing when id does not exist', () => {
+      const store = makeStore();
+      saveToHistory(ENTRY, store);
+      deleteFromHistory('does-not-exist', store);
+      expect(loadHistory(store)).toHaveLength(1);
+    });
+
     it('leaves other entries intact', () => {
       const store = makeStore();
       const entryB = {
