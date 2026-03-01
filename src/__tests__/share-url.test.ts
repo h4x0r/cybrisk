@@ -74,6 +74,17 @@ describe('decodeInputs', () => {
     expect(decodeInputs(bad)).toBeNull();
   });
 
+  it('handles base64url whose padded length is already divisible by 4 (no-padding branch)', () => {
+    // btoa('abc') = 'YWJj' — 4 chars, 4 % 4 = 0 → padding = '' branch in fromBase64Url
+    // 'abc' is not valid JSON so decodeInputs returns null, but the branch is exercised
+    expect(decodeInputs('YWJj')).toBeNull();
+  });
+
+  it('handles base64url whose padded length requires == padding', () => {
+    // btoa('a') = 'YQ==' → stripped to 'YQ' — 2 % 4 = 2 → padding = '==' branch
+    expect(decodeInputs('YQ')).toBeNull();
+  });
+
   it('returns null for valid JSON that fails AssessmentInputs schema', () => {
     const badData = { company: { industry: 'not_a_real_industry' } };
     const encoded = btoa(JSON.stringify(badData))

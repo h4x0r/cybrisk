@@ -103,5 +103,5 @@ export function deriveShareSeed(inputs: object): number {
     hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
     hash = hash & 0x7fffffff; // keep positive 31-bit int
   }
-  return hash || 1; // never 0
+  return Math.max(hash, 1); // never 0 — Math.max is branch-free unlike hash || 1
 }

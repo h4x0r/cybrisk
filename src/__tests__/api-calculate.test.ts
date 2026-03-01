@@ -5,7 +5,7 @@
  * we test the POST function directly by constructing Request objects.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { POST } from '@/app/api/calculate/route';
 import type { AssessmentInputs } from '@/lib/types';
 
@@ -141,5 +141,45 @@ describe('POST /api/calculate', () => {
     const req = makeRequest(VALID_INPUTS);
     const res = await POST(req as any);
     expect(res.status).toBe(200);
+  });
+
+  it('uses undefined seed when seed value fails validation (seedParsed false branch)', async () => {
+    // RequestBodySchema requires seed to be a number; passing a string makes success=false
+    // → seed falls back to undefined → non-deterministic simulation still returns 200
+    const testIp = `test-seed-fallback-${Date.now()}`;
+    const req = new Request('http://localhost:3000/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': testIp },
+      body: JSON.stringify({ ...VALID_INPUTS, seed: 'not-a-number' }),
+    });
+    const res = await POST(req as never);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ale).toBeDefined();
+  });
+
+  it('returns 500 when simulate throws an unexpected error', async () => {
+    // Use a unique IP to avoid hitting the shared rate limit from earlier tests
+    const testIp = `test-500-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    function makeIpRequest(body: unknown) {
+      return new Request('http://localhost:3000/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': testIp },
+        body: JSON.stringify(body),
+      });
+    }
+    // Temporarily replace the simulate module binding so the route's catch fires
+    const monteCarlo = await import('@/lib/monte-carlo');
+    const spy = vi.spyOn(monteCarlo, 'simulate').mockImplementation(() => {
+      throw new Error('unexpected simulation error');
+    });
+    try {
+      const res = await POST(makeIpRequest(VALID_INPUTS) as never);
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.error).toBe('Simulation failed');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

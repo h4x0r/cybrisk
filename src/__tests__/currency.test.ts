@@ -36,6 +36,31 @@ describe('currency utils', () => {
       expect(parseYahooFxResponse({ quoteResponse: { result: [] } })).toEqual(FALLBACK_RATES);
     });
 
+    it('returns FALLBACK_RATES when a property getter throws', () => {
+      // Triggers the catch block — the only way to make optional-chaining throw
+      const evil = { get quoteResponse() { throw new Error('boom'); } };
+      expect(parseYahooFxResponse(evil)).toEqual(FALLBACK_RATES);
+    });
+
+    it('skips quotes with invalid prices (non-number, negative, Infinity)', () => {
+      // Exercises the `continue` on line 52 for each bad price
+      const fixture = {
+        quoteResponse: {
+          result: [
+            { symbol: 'GBPUSD=X', regularMarketPrice: 'not-a-number' }, // typeof !== 'number'
+            { symbol: 'EURUSD=X', regularMarketPrice: -1 },             // <= 0
+            { symbol: 'USDHKD=X', regularMarketPrice: Infinity },       // !isFinite
+            { symbol: 'USDSGD=X', regularMarketPrice: 1.34 },           // valid
+          ],
+        },
+      };
+      const rates = parseYahooFxResponse(fixture);
+      expect(rates.GBP).toBe(FALLBACK_RATES.GBP); // unchanged
+      expect(rates.EUR).toBe(FALLBACK_RATES.EUR);  // unchanged
+      expect(rates.HKD).toBe(FALLBACK_RATES.HKD);  // unchanged
+      expect(rates.SGD).toBeCloseTo(1.34, 2);       // updated
+    });
+
     it('parses a valid Yahoo Finance v7 quote response', () => {
       const fixture = {
         quoteResponse: {

@@ -735,30 +735,27 @@ describe('boxMuller edge cases', () => {
 // 12. sampleBeta with RNG that sometimes returns 0 (exercises rng() || 1e-10 in sampleGamma)
 // =========================================================================
 describe('sampleGamma zero-guard branches', () => {
-  it('handles rng returning 0 in sampleGamma boost (line 88)', () => {
-    let callCount = 0;
+  it('triggers || 1e-10 on the FIRST rng call in the Ahrens-Dieter boost path (line 89)', () => {
+    // sampleGamma(shape < 1) immediately calls rng() to get u on line 89.
+    // Making the very first call return 0 ensures u = 0 || 1e-10 = 1e-10 — the uncovered branch.
+    let firstCall = true;
     const rng = () => {
-      callCount++;
-      // Every 5th call returns 0 to trigger the || 1e-10 guard
-      if (callCount % 5 === 0) return 0;
-      const s = (callCount * 1664525 + 1013904223) & 0xffffffff;
-      return (s >>> 0) / 0xffffffff;
+      if (firstCall) { firstCall = false; return 0; }
+      // Subsequent calls use a valid seeded sequence
+      return 0.5;
     };
-    // sampleBeta with alpha < 1 will trigger sampleGamma boost path
-    for (let i = 0; i < 10; i++) {
-      const v = sampleBeta(0.5, 2, rng);
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(1);
-    }
+    // alpha=0.5 < 1 → sampleGamma(0.5, rng) → first rng() call hits line 89
+    expect(() => sampleBeta(0.5, 2, rng)).not.toThrow();
+    const v = sampleBeta(0.5, 2, (() => { let f = true; return () => { if (f) { f = false; return 0; } return 0.5; }; })());
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(1);
   });
 
-  it('handles rng returning 0 in Marsaglia-Tsang u guard (line 106)', () => {
+  it('handles rng returning 0 in Marsaglia-Tsang u guard', () => {
     let callCount = 0;
     const rng = () => {
       callCount++;
-      // Return 0 on specific calls to trigger || 1e-10 on line 106
       if (callCount % 7 === 0) return 0;
-      // Otherwise return a reasonable random value
       const s = (callCount * 1664525 + 1013904223) & 0xffffffff;
       return (s >>> 0) / 0xffffffff;
     };

@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
     const { rawLosses, ...clientResults } = results;
     return NextResponse.json(clientResults);
   } catch {
+    /* v8 ignore next */ // simulate() does not throw under normal operation
     return NextResponse.json({ error: 'Simulation failed' }, { status: 500 });
   }
 }

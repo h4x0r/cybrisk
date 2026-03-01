@@ -12,7 +12,6 @@ const makeStore = () => {
   return {
     getItem: (_key: string) => data,
     setItem: (_key: string, value: string) => { data = value; },
-    removeItem: (_key: string) => { data = null; },
   };
 };
 

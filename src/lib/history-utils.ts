@@ -18,15 +18,16 @@ export interface HistoryEntry {
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
-  removeItem(key: string): void;
 }
 
-const browserStorage: StorageLike = typeof window !== 'undefined'
-  ? window.localStorage
-  : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+/** Lazy accessor so window is evaluated at call time, not module load — enables testing both branches. */
+function getBrowserStorage(): StorageLike {
+  if (typeof window !== 'undefined') return window.localStorage;
+  return { getItem: () => null, setItem: () => {} };
+}
 
 /** Load history from storage, sorted newest-first. */
-export function loadHistory(storage: StorageLike = browserStorage): HistoryEntry[] {
+export function loadHistory(storage: StorageLike = getBrowserStorage()): HistoryEntry[] {
   try {
     const raw = storage.getItem(HISTORY_KEY);
     if (!raw) return [];
@@ -40,7 +41,7 @@ export function loadHistory(storage: StorageLike = browserStorage): HistoryEntry
 }
 
 /** Save a new entry, deduplicating identical inputs within DEDUP_WINDOW_MS. Caps at MAX_ENTRIES. */
-export function saveToHistory(entry: HistoryEntry, storage: StorageLike = browserStorage): void {
+export function saveToHistory(entry: HistoryEntry, storage: StorageLike = getBrowserStorage()): void {
   const existing = loadHistory(storage);
   const entryTime = new Date(entry.savedAt).getTime();
   const inputsStr = JSON.stringify(entry.inputs);
@@ -57,7 +58,7 @@ export function saveToHistory(entry: HistoryEntry, storage: StorageLike = browse
 }
 
 /** Remove the entry with the given id. */
-export function deleteFromHistory(id: string, storage: StorageLike = browserStorage): void {
+export function deleteFromHistory(id: string, storage: StorageLike = getBrowserStorage()): void {
   const existing = loadHistory(storage);
   if (!existing.some(e => e.id === id)) return;
   const updated = existing.filter(e => e.id !== id);
