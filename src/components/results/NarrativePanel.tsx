@@ -74,6 +74,8 @@ export function NarrativePanel({ inputs, results, currency, onNarrativeReady }: 
   return (
     <div
       className="rounded-lg p-4 mb-6"
+      aria-live="polite"
+      aria-busy={status === 'loading' || status === 'streaming'}
       style={{
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)',
