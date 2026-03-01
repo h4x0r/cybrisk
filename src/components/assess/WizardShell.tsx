@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { AssessmentInputs } from '@/lib/types';
+import { saveDraft, loadDraft, clearDraft } from '@/lib/wizard-draft';
 
 import StepCompanyProfile from './StepCompanyProfile';
 import StepDataProfile from './StepDataProfile';
@@ -44,6 +45,12 @@ export default function WizardShell() {
   const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
 
+  // Restore draft from localStorage on mount (client-only)
+  useEffect(() => {
+    const saved = loadDraft();
+    if (saved) setData(saved);
+  }, []);
+
   const onUpdate = useCallback(
     (partial: Partial<AssessmentInputs>) => {
       setData((prev) => {
@@ -60,6 +67,7 @@ export default function WizardShell() {
         if (partial.threats) {
           merged.threats = { ...prev.threats, ...partial.threats } as AssessmentInputs['threats'];
         }
+        saveDraft(merged);
         return merged;
       });
       setError(null);
@@ -105,8 +113,9 @@ export default function WizardShell() {
     setError(null);
 
     if (step === STEPS.length - 1) {
-      // Final submit
+      // Final submit — persist to sessionStorage, clear draft, navigate
       sessionStorage.setItem('assessment', JSON.stringify(data));
+      clearDraft();
       router.push('/simulate');
       return;
     }
