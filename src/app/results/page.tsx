@@ -12,6 +12,12 @@ import ResultsSurface from '@/components/results/ResultsSurface';
 import { TEF_BY_INDUSTRY } from '@/lib/lookup-tables';
 import { encodeInputs, deriveShareSeed } from '@/lib/share-url';
 import dynamic from 'next/dynamic';
+import { useCurrency } from '@/hooks/useCurrency';
+import { CurrencySelector } from '@/components/results/CurrencySelector';
+import { NarrativePanel } from '@/components/results/NarrativePanel';
+import { EmailModal } from '@/components/results/EmailModal';
+import { saveToHistory } from '@/lib/history-utils';
+import { formatCurrency } from '@/lib/currency';
 
 const ThreatOriginMap = dynamic(
   () => import('@/components/results/ThreatOriginMap'),
@@ -42,7 +48,21 @@ function ResultsPage() {
   const [exporting, setExporting] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const { currency, setCurrency, rates } = useCurrency();
+  const [narrative, setNarrative] = useState<string>('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
   useEffect(() => {
+    // Handle history restore
+    const restore = sessionStorage.getItem('cybrisk_restore');
+    if (restore) {
+      sessionStorage.removeItem('cybrisk_restore');
+      const entry = JSON.parse(restore);
+      setInputs(entry.inputs);
+      setResults(entry.results);
+      return;
+    }
+
     // Check for shareable URL params first
     const encoded = searchParams.get('s');
     const seedParam = searchParams.get('seed');
@@ -65,6 +85,18 @@ function ResultsPage() {
           setResults(simResults);
           sessionStorage.setItem('assessment', JSON.stringify(decoded));
           sessionStorage.setItem('results', JSON.stringify(simResults));
+
+          // Auto-save to history
+          if (decoded && simResults) {
+            saveToHistory({
+              id: crypto.randomUUID(),
+              savedAt: new Date().toISOString(),
+              label: `${decoded.company.industry} · ${decoded.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
+              inputs: decoded,
+              results: simResults,
+              currency,
+            });
+          }
         });
       });
       return;
@@ -81,11 +113,25 @@ function ResultsPage() {
 
       const rawInputs = sessionStorage.getItem('assessment');
       if (rawInputs) {
-        setInputs(JSON.parse(rawInputs) as AssessmentInputs);
+        const parsedInputs = JSON.parse(rawInputs) as AssessmentInputs;
+        setInputs(parsedInputs);
+
+        // Auto-save to history
+        if (parsedInputs && parsed) {
+          saveToHistory({
+            id: crypto.randomUUID(),
+            savedAt: new Date().toISOString(),
+            label: `${parsedInputs.company.industry} · ${parsedInputs.company.geography} · ${new Date().toLocaleDateString('en-GB')}`,
+            inputs: parsedInputs,
+            results: parsed,
+            currency,
+          });
+        }
       }
     } catch {
       router.replace('/assess');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams]);
 
   const handleShare = useCallback(() => {
@@ -134,8 +180,23 @@ function ResultsPage() {
       <LorenzCanvas riskRating={results.riskRating} ale={results.ale.mean} />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
-        {/* Ticker Bar */}
-        <TickerBar results={results} />
+        {/* Ticker Bar with Currency Selector */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <TickerBar results={results} />
+          </div>
+          <CurrencySelector currency={currency} onChange={setCurrency} />
+        </div>
+
+        {/* Narrative Panel */}
+        {inputs && results && (
+          <NarrativePanel
+            inputs={inputs}
+            results={results}
+            currency={currency}
+            onNarrativeReady={setNarrative}
+          />
+        )}
 
         {/* Charts - two columns */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -279,6 +340,15 @@ function ResultsPage() {
             </button>
           )}
           {inputs && (
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="px-4 py-2 rounded-lg text-sm font-medium"
+              style={{ background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4' }}
+            >
+              Email Report
+            </button>
+          )}
+          {inputs && (
             <a
               href="/compare"
               className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105"
@@ -320,6 +390,18 @@ function ResultsPage() {
           </a>
         </div>
       </div>
+
+      {/* Email Modal */}
+      {showEmailModal && inputs && results && (
+        <EmailModal
+          inputs={inputs}
+          results={results}
+          currency={currency}
+          rates={rates}
+          narrative={narrative}
+          onClose={() => setShowEmailModal(false)}
+        />
+      )}
     </main>
   );
 }
