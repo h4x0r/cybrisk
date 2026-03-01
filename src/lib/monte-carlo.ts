@@ -16,6 +16,7 @@ import type {
   KeyDriver,
   RiskRating,
   DataType,
+  ThreatType,
 } from '@/lib/types';
 
 import {
@@ -27,6 +28,7 @@ import {
   BASE_VULNERABILITY,
   REVENUE_MIDPOINTS,
   EMPLOYEE_MULTIPLIERS,
+  ATTACK_PATTERN_FREQ,
 } from '@/lib/lookup-tables';
 
 import { optimalSpend } from '@/lib/gordon-loeb';
@@ -151,14 +153,32 @@ export function samplePERT(
 // ---------------------------------------------------------------------------
 // 5. Sample Threat Event Frequency
 // ---------------------------------------------------------------------------
+
+/**
+ * Compute a TEF multiplier from the user's selected threat concerns.
+ * Uses ATTACK_PATTERN_FREQ from DBIR 2025.
+ * Clamped to [0.8, 1.5] to keep results within plausible bounds.
+ */
+function computeThreatMultiplier(topConcerns: ThreatType[]): number {
+  if (topConcerns.length === 0) return 1.0;
+  const freqs = Object.values(ATTACK_PATTERN_FREQ);
+  const baseline = freqs.reduce((a, b) => a + b, 0) / freqs.length;
+  const selected = topConcerns.reduce(
+    (sum, t) => sum + (ATTACK_PATTERN_FREQ[t] ?? baseline),
+    0,
+  ) / topConcerns.length;
+  return Math.max(0.8, Math.min(1.5, selected / baseline));
+}
+
 export function sampleTEF(
   inputs: AssessmentInputs,
   rng: RNG = Math.random,
 ): number {
   const tef = TEF_BY_INDUSTRY[inputs.company.industry];
   const baseTEF = samplePERT(tef.min, tef.mode, tef.max, rng);
-  const multiplier = EMPLOYEE_MULTIPLIERS[inputs.company.employees];
-  return baseTEF * multiplier;
+  const empMultiplier = EMPLOYEE_MULTIPLIERS[inputs.company.employees];
+  const threatMultiplier = computeThreatMultiplier(inputs.threats.topConcerns);
+  return baseTEF * empMultiplier * threatMultiplier;
 }
 
 // ---------------------------------------------------------------------------

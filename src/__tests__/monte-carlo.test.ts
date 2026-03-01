@@ -340,3 +340,49 @@ describe('simulate', () => {
     expect(r1.ale.mean).toBeGreaterThan(r2.ale.mean);
   });
 });
+
+// BASE_INPUTS fixture for sampleTEF threat multiplier tests
+const BASE_INPUTS: AssessmentInputs = {
+  company: { industry: 'financial', revenueBand: '50m_250m', employees: '250_1000', geography: 'us' },
+  data: { dataTypes: ['customer_pii'], recordCount: 100_000, cloudPercentage: 50 },
+  controls: { securityTeam: false, irPlan: false, aiAutomation: false, mfa: false, pentest: false, cyberInsurance: false },
+  threats: { topConcerns: ['ransomware'], previousIncidents: '0' },
+};
+
+describe('sampleTEF threat multiplier', () => {
+  it('ransomware selection produces higher mean TEF than lost_stolen', () => {
+    const seededRng = (seed: number) => {
+      let s = seed;
+      return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+    };
+    const highThreat = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: ['ransomware'] as any } };
+    const lowThreat  = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: ['lost_stolen'] as any } };
+
+    const N = 1000;
+    let highSum = 0, lowSum = 0;
+    for (let i = 0; i < N; i++) {
+      highSum += sampleTEF(highThreat, seededRng(i));
+      lowSum  += sampleTEF(lowThreat,  seededRng(i));
+    }
+    expect(highSum / N).toBeGreaterThan(lowSum / N);
+  });
+
+  it('threat multiplier is clamped to [0.8, 1.5]', () => {
+    const rng = () => 0.5;
+    // Use a neutral baseline (empty topConcerns → multiplier = 1.0) as reference
+    const neutralInputs = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: [] as any } };
+    const highInputs    = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: ['ransomware'] as any } };
+    const lowInputs     = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: ['lost_stolen'] as any } };
+    const neutralTEF = sampleTEF(neutralInputs, rng);
+    // ransomware freq/baseline >> 1.5 → clamped at 1.5
+    expect(sampleTEF(highInputs, rng) / neutralTEF).toBeLessThanOrEqual(1.5);
+    // lost_stolen freq/baseline << 0.8 → clamped at 0.8
+    expect(sampleTEF(lowInputs, rng) / neutralTEF).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('empty topConcerns returns a positive value without throwing', () => {
+    const rng = () => 0.5;
+    const noThreats = { ...BASE_INPUTS, threats: { ...BASE_INPUTS.threats, topConcerns: [] as any } };
+    expect(sampleTEF(noThreats, rng)).toBeGreaterThan(0);
+  });
+});
